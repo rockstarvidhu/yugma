@@ -1,26 +1,45 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --yugma-forest: #2E3A2F;
+  --yugma-sand: #EDE7DB;
+  --yugma-sage: #A7B097;
+  --yugma-terracotta: #A7684F;
+  --yugma-charcoal: #1F1F1F;
+}
+
+/* Corporate surfaces opt in; invitation themes own their semantic values. */
+.yugma-brand {
+  --background: var(--yugma-sand);
+  --foreground: var(--yugma-charcoal);
+  --heading: var(--yugma-forest);
+  --muted: var(--yugma-forest);
+  --border: var(--yugma-sage);
+  --primary: var(--yugma-forest);
+  --on-primary: var(--yugma-sand);
+  --accent: var(--yugma-terracotta);
+  --focus: var(--yugma-forest);
+  background: var(--background);
+  color: var(--foreground);
 }
 
 @theme inline {
+  --color-forest: var(--yugma-forest);
+  --color-sand: var(--yugma-sand);
+  --color-sage: var(--yugma-sage);
+  --color-terracotta: var(--yugma-terracotta);
+  --color-charcoal: var(--yugma-charcoal);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-heading: var(--heading);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
+  --color-accent: var(--accent);
+  --color-focus: var(--focus);
+  --font-sans: var(--font-inter);
+  --font-editorial: var(--font-playfair);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
+body { font-family: var(--font-inter), Arial, sans-serif; }
