@@ -1,11 +1,11 @@
 @import "tailwindcss";
 
 :root {
-  --yugma-forest: #2E3A2F;
-  --yugma-sand: #EDE7DB;
-  --yugma-sage: #A7B097;
-  --yugma-terracotta: #A7684F;
-  --yugma-charcoal: #1F1F1F;
+  --yugma-forest: #2e3a2f;
+  --yugma-sand: #ede7db;
+  --yugma-sage: #a7b097;
+  --yugma-terracotta: #a7684f;
+  --yugma-charcoal: #1f1f1f;
 }
 
 /* Corporate surfaces opt in; invitation themes own their semantic values. */
@@ -42,4 +42,6 @@
   --font-editorial: var(--font-playfair);
 }
 
-body { font-family: var(--font-inter), Arial, sans-serif; }
+body {
+  font-family: var(--font-inter), Arial, sans-serif;
+}

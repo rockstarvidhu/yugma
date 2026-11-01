@@ -7,17 +7,17 @@ Assets were imported from `YUGMA_Production_Brand_Assets.zip`, using its
 unchanged. The archive itself and duplicate raster logos are not included.
 The supplier describes the vectors as reconstructions of the selected concepts,
 not mathematically identical copies of the original brand board. This integration
-does not redesign them. The original board was not included for comparison.
+does not redesign them. The original board was subsequently supplied and confirmed as the visual reference.
 
 ## Palette and tokens
 
-| Colour | Value | Corporate role |
-| --- | --- | --- |
-| Forest | `#2E3A2F` | Headings, text, primary controls |
-| Sand | `#EDE7DB` | Backgrounds, text on forest |
-| Sage | `#A7B097` | Dividers, supporting surfaces |
-| Terracotta | `#A7684F` | Decorative accents |
-| Charcoal | `#1F1F1F` | Body text |
+| Colour     | Value     | Corporate role                   |
+| ---------- | --------- | -------------------------------- |
+| Forest     | `#2E3A2F` | Headings, text, primary controls |
+| Sand       | `#EDE7DB` | Backgrounds, text on forest      |
+| Sage       | `#A7B097` | Dividers, supporting surfaces    |
+| Terracotta | `#A7684F` | Decorative accents               |
+| Charcoal   | `#1F1F1F` | Body text                        |
 
 `src/app/globals.css` defines immutable `--yugma-*` palette variables and Tailwind
 v4 colour mappings. Corporate surfaces opt in with `className="yugma-brand"`.
@@ -87,7 +87,8 @@ paths under `/brand/` and preserve the supplier's maskable variants.
 
 ## Validation
 
-Run `npm run lint`, `npx tsc --noEmit`, and `npm run build`. No existing test runner
-was configured in the initial project. After building, run `npm start` and confirm
+Run `npm run lint`, `npm run format:check`, `npm run typecheck`,
+`npm run test`, and `npm run build`. Vitest covers the homepage identity, logo
+accessibility, button semantics, and development-only preview guard. After building, run `npm start` and confirm
 `/dev/brand` returns 404, `/` includes icon/manifest/social tags and all `/brand/`
 resources resolve. Check the generated social URL against the deployment origin.

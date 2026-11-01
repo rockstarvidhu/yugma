@@ -11,8 +11,17 @@ type BrandLogoProps = {
   | { decorative?: false; href?: string; label?: string }
 );
 
-export function BrandLogo({ variant = "wordmark", tone = "forest", className = "", priority = false, ...accessibility }: BrandLogoProps) {
-  const dimensions = variant === "wordmark" ? { width: 1832, height: 436 } : { width: 763, height: 969 };
+export function BrandLogo({
+  variant = "wordmark",
+  tone = "forest",
+  className = "",
+  priority = false,
+  ...accessibility
+}: BrandLogoProps) {
+  const dimensions =
+    variant === "wordmark"
+      ? { width: 1832, height: 436 }
+      : { width: 763, height: 969 };
   const logo = (
     <Image
       src={`/brand/yugma-${variant}-${tone}.svg`}
@@ -24,8 +33,13 @@ export function BrandLogo({ variant = "wordmark", tone = "forest", className = "
   );
   const sizing = `${variant === "wordmark" ? "w-40 sm:w-52" : "w-20 sm:w-24"} max-w-full ${className}`;
   return accessibility.href ? (
-    <Link href={accessibility.href} className={`inline-block rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-current ${sizing}`}>
+    <Link
+      href={accessibility.href}
+      className={`inline-block rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-current ${sizing}`}
+    >
       {logo}
     </Link>
-  ) : <span className={`inline-block ${sizing}`}>{logo}</span>;
+  ) : (
+    <span className={`inline-block ${sizing}`}>{logo}</span>
+  );
 }

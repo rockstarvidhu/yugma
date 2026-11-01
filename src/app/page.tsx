@@ -8,17 +8,32 @@ export const metadata: Metadata = {
     title: "YUGMA",
     description: "Thoughtfully crafted digital invitations.",
     type: "website",
-    images: [{ url: "/brand/yugma-og-brand.png", width: 1200, height: 630, alt: "YUGMA — thoughtfully crafted digital invitations" }],
+    images: [
+      {
+        url: "/brand/yugma-og-brand.png",
+        width: 1200,
+        height: 630,
+        alt: "YUGMA — thoughtfully crafted digital invitations",
+      },
+    ],
   },
-  twitter: { card: "summary_large_image", title: "YUGMA", images: ["/brand/yugma-og-brand.png"] },
+  twitter: {
+    card: "summary_large_image",
+    title: "YUGMA",
+    images: ["/brand/yugma-og-brand.png"],
+  },
 };
 
 export default function Home() {
   return (
     <main className="yugma-brand flex min-h-svh items-center">
       <Container className="py-24 text-center">
-        <h1><BrandLogo priority /></h1>
-        <p className="mt-8 text-sm leading-7 text-muted">Thoughtfully crafted digital invitations.</p>
+        <h1>
+          <BrandLogo priority />
+        </h1>
+        <p className="mt-8 text-sm leading-7 text-muted">
+          Thoughtfully crafted digital invitations.
+        </p>
       </Container>
     </main>
   );
