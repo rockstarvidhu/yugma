@@ -1,36 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# YUGMA
 
-## Getting Started
+YUGMA is a mobile-first wedding invitation experience. Week 01 builds one
+fictional, watermarked Heirloom demo and the reusable foundations around it.
+The demo does not publish paid invitations or store visitor details.
 
-First, run the development server:
+## Local setup
+
+Use Node.js 22 and npm. From the repository root, install the pinned dependencies
+and start the development server:
 
 ```bash
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). To prepare a pull request,
+run the same checks used by CI:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run lint
+npm run format:check
+npm run typecheck
+npm run test
+npm run build
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Use `npm run format` to apply the repository's Prettier formatting. Add or update
+dependencies with npm and commit the resulting `package-lock.json`; CI installs
+with `npm ci` so it uses that lockfile exactly.
 
-## Learn More
+## Pull requests and branches
 
-To learn more about Next.js, take a look at the following resources:
+Create a short-lived branch from the latest `main` and open a pull request back
+to `main`. Do not push directly to `main`. CI runs on pull requests and checks
+lint, formatting, TypeScript, unit tests, and the production build. Have the
+other teammate review the pull request before merging. Mention changes to shared
+contracts, routes, or styles in the pull request description.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Environment and privacy
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+No environment variables are required for the local demo. `.env*` files are
+ignored by Git. Never commit secrets, actual customer information, or personal
+visitor data. If a future feature needs configuration, document variable names
+in a secret-free `.env.example` file.
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Demo content must remain fictional and visibly marked `YUGMA • DEMO`. The
+watermark is not access control, and client-side state must never authorize an
+unwatermarked or paid invitation. Week 01 does not include accounts, uploads,
+payments, persistent customer data, or paid-service integrations.
