@@ -1,25 +1,14 @@
+// Compatibility import path: every public model is inferred from its Zod schema.
+export type {
+  Invitation,
+  WeddingEvent,
+  WeddingVenue,
+  Partner,
+  Couple,
+  InvitationImage,
+  FocalPosition,
+  InvitationInput,
+} from "@/lib/invitation-schema";
+
+/** @deprecated A legacy suggested zone only; use each invitation's required timeZone. */
 export const INVITATION_TIME_ZONE = "Asia/Kolkata" as const;
-
-export type WeddingVenue = {
-  name: string;
-  address: string;
-  mapsUrl: string;
-};
-
-export type WeddingEvent = {
-  title: string;
-  startsAt: string;
-  venue: WeddingVenue;
-  dressCode?: string;
-};
-
-export type Invitation = {
-  couple: {
-    partnerOne: string;
-    partnerTwo: string;
-  };
-  welcomeNote?: string;
-  hosts?: string[];
-  coverImage: string;
-  events: WeddingEvent[];
-};
