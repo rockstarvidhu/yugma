@@ -1,8 +1,7 @@
 import type { ComponentType } from "react";
-import type { TemporaryInvitation } from "./internal/temporary-invitation";
+import type { Invitation } from "@/types/invitation";
 
-// Replace this boundary with the canonical Invitation import after Track A merges.
-export type InvitationTemplateProps = { invitation: TemporaryInvitation };
+export type InvitationTemplateProps = { invitation: Invitation };
 export type TemplateDefinition = {
   readonly id: string;
   readonly Component: ComponentType<InvitationTemplateProps>;

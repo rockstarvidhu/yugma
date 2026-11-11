@@ -21,11 +21,13 @@ export function Afterglow({ invitation }: InvitationTemplateProps) {
           ✧
         </span>
         <h1>
-          {invitation.names[0]}{" "}
+          {invitation.couple.partnerOne}{" "}
           <span className="afterglow-ampersand">&amp;</span>{" "}
-          {invitation.names[1]}
+          {invitation.couple.partnerTwo}
         </h1>
-        <p className="afterglow-welcome">{invitation.welcome}</p>
+        {invitation.welcomeNote && (
+          <p className="afterglow-welcome">{invitation.welcomeNote}</p>
+        )}
         <a className="afterglow-link" href="#celebration">
           The celebration <span aria-hidden="true">↓</span>
         </a>
@@ -49,8 +51,8 @@ export function Afterglow({ invitation }: InvitationTemplateProps) {
                 </time>
               </p>
               <p className="afterglow-zone">{invitation.timeZone}</p>
-              <p className="afterglow-venue">{event.venue}</p>
-              <p>{event.address}</p>
+              <p className="afterglow-venue">{event.venue.name}</p>
+              <p>{event.venue.address}</p>
             </li>
           ))}
         </ul>

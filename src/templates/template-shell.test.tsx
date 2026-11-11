@@ -1,3 +1,4 @@
+import { invitationSchema } from "@/lib/invitation-schema";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { Afterglow } from "./afterglow/Afterglow";
@@ -40,28 +41,34 @@ describe("template registry and renderer", () => {
     ).toThrow("non-empty and trimmed");
   });
   it("renders supplied names, welcome, events and venues with explicit timezone", () => {
-    const invitation = {
+    const invitation = invitationSchema.parse({
       ...shellDemoInvitation,
-      names: ["Alex", "Sam"] as const,
-      welcome: "Our own welcome",
+      couple: { partnerOne: "Alex", partnerTwo: "Sam" },
+      welcomeNote: "Our own welcome",
       timeZone: "UTC",
       events: [
         {
           id: "new",
           title: "An evening together",
           startsAt: "2027-12-12T12:00:00Z",
-          venue: "Orchid House",
-          address: "Fictional address",
+          venue: {
+            name: "Orchid House",
+            address: "Fictional address",
+            mapsUrl: "https://maps.google.com/?q=Jaipur+Rajasthan",
+          },
         },
         {
           id: "second",
           title: "Morning gathering",
           startsAt: "2027-12-13T10:00:00Z",
-          venue: "Garden Court",
-          address: "Another fictional address",
+          venue: {
+            name: "Garden Court",
+            address: "Another fictional address",
+            mapsUrl: "https://maps.google.com/?q=Jaipur+Rajasthan",
+          },
         },
       ],
-    };
+    });
     render(
       <InvitationRenderer templateId="afterglow" invitation={invitation} />,
     );
@@ -83,9 +90,26 @@ describe("template registry and renderer", () => {
     ).toHaveAttribute("datetime", "2027-12-12T12:00:00Z");
     expect(screen.getByText(/12 December 2027/)).toHaveTextContent("12:00");
   });
+  it("renders an invitation with a long name and no welcome note or photos", () => {
+    const longName = "A".repeat(80);
+    const invitation = invitationSchema.parse({
+      ...shellDemoInvitation,
+      couple: { partnerOne: longName, partnerTwo: "Sam" },
+      welcomeNote: undefined,
+    });
+
+    const { container } = render(
+      <InvitationRenderer templateId="afterglow" invitation={invitation} />,
+    );
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      `${longName} & Sam`,
+    );
+    expect(container.querySelector(".afterglow-welcome")).toBeNull();
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+  });
   it("renders another registered component without renderer changes", () => {
     function Second({ invitation }: InvitationTemplateProps) {
-      return <h1>A second style for {invitation.names[0]}</h1>;
+      return <h1>A second style for {invitation.couple.partnerOne}</h1>;
     }
     const registry = createTemplateRegistry([
       { id: "afterglow", Component: Afterglow },
