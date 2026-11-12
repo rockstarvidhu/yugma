@@ -1,0 +1,118 @@
+.afterglow-invitation {
+  --afterglow-ivory: #faf5eb;
+  --afterglow-burgundy: #592638;
+  --afterglow-gold: #927344;
+  background: var(--afterglow-ivory);
+  color: var(--afterglow-burgundy);
+  min-height: 100svh;
+  padding: 0 1.5rem;
+  overflow-wrap: anywhere;
+}
+.afterglow-cover,
+.afterglow-celebration,
+.afterglow-closing {
+  max-width: 56rem;
+  margin: auto;
+  text-align: center;
+}
+.afterglow-cover {
+  padding: 5rem 0 4rem;
+}
+.afterglow-eyebrow {
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  line-height: 1.8;
+}
+.afterglow-ornament {
+  display: block;
+  color: var(--afterglow-gold);
+  font-size: 2rem;
+  margin: 2rem 0;
+}
+.afterglow-invitation h1,
+.afterglow-invitation h2,
+.afterglow-invitation h3 {
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 400;
+}
+.afterglow-invitation h1 {
+  font-size: clamp(2.6rem, 8vw, 5.5rem);
+  line-height: 1.15;
+  margin: 0;
+}
+.afterglow-ampersand {
+  display: block;
+  font-style: italic;
+  font-size: 0.65em;
+  margin: 0.25em 0;
+}
+.afterglow-welcome {
+  max-width: 32rem;
+  margin: 2rem auto;
+  line-height: 1.9;
+}
+.afterglow-link {
+  display: inline-flex;
+  gap: 1rem;
+  align-items: center;
+  min-height: 44px;
+  padding: 0.5rem;
+  text-underline-offset: 0.4em;
+  text-decoration: underline;
+}
+.afterglow-link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 4px;
+}
+.afterglow-celebration {
+  padding: 3rem 0;
+  border-top: 1px solid var(--afterglow-gold);
+  scroll-margin-top: 2rem;
+}
+.afterglow-invitation h2 {
+  font-size: clamp(2rem, 5vw, 3rem);
+  line-height: 1.3;
+  margin: 1rem 0 2rem;
+}
+.afterglow-events {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 1.25rem;
+}
+.afterglow-event {
+  padding: 2rem 1rem;
+  border: 1px solid #d9c9b0;
+}
+.afterglow-invitation h3 {
+  font-size: 1.75rem;
+  margin: 0 0 1rem;
+}
+.afterglow-event p {
+  line-height: 1.8;
+}
+.afterglow-zone {
+  font-size: 0.75rem;
+}
+.afterglow-venue {
+  font-weight: 600;
+  margin-top: 1rem;
+}
+.afterglow-closing {
+  padding: 1rem 0 6rem;
+}
+.afterglow-closing p {
+  line-height: 1.8;
+}
+@media (min-width: 48rem) {
+  .afterglow-cover {
+    padding-top: 7rem;
+  }
+  .afterglow-events {
+    grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  }
+  .afterglow-event {
+    padding: 2.5rem 1.5rem;
+  }
+}

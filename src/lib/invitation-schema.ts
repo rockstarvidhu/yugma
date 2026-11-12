@@ -1,80 +1,121 @@
 import { z } from "zod";
-import type { Invitation } from "@/types/invitation";
+
+export const MAX_EVENTS = 5;
+export const MAX_GALLERY_IMAGES = 20;
 
 const text = (label: string, maxLength: number) =>
+  z.string().trim().min(1, `${label} is required.`).max(maxLength);
+const optionalText = (label: string, maxLength: number) =>
   z
     .string()
     .trim()
-    .min(1, `${label} is required.`)
-    .max(maxLength, `${label} must be ${maxLength} characters or fewer.`);
-
+    .transform((value) => (value === "" ? undefined : value))
+    .pipe(text(label, maxLength).optional())
+    .optional();
 const webUrl = (label: string) =>
-  z.url({ error: `${label} must be a valid URL.` }).pipe(
-    z.string().refine((value) => {
-      const protocol = new URL(value).protocol;
-      return protocol === "https:" || protocol === "http:";
-    }, `${label} must use http or https.`),
-  );
+  z
+    .string()
+    .trim()
+    .max(2048)
+    .pipe(z.url({ error: `${label} must be a valid URL.` }))
+    .refine((value) => {
+      try {
+        const url = new URL(value);
+        return (
+          ["http:", "https:"].includes(url.protocol) &&
+          !url.username &&
+          !url.password
+        );
+      } catch {
+        return false;
+      }
+    }, `${label} must use HTTP/HTTPS without credentials.`);
 
-const kolkataDateTime = z.iso
-  .datetime({ offset: true, message: "Use an ISO 8601 date and time." })
-  .refine((value) => value.endsWith("+05:30"), {
-    message: "Use the Asia/Kolkata offset (+05:30).",
-  })
+export const timeZoneSchema = text("IANA timezone", 100).refine((value) => {
+  if (/^[+-]/.test(value)) return false;
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: value }).format(0);
+    return true;
+  } catch {
+    return false;
+  }
+}, "Use a valid IANA timezone, such as Asia/Kolkata or Europe/London.");
+
+const eventDateTime = z
+  .string()
+  .max(64)
+  .pipe(z.iso.datetime({ offset: true }))
   .refine(
-    (value) => {
-      const instant = new Date(value);
-      if (Number.isNaN(instant.getTime())) return false;
-
-      const parts = new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Asia/Kolkata",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hourCycle: "h23",
-      }).formatToParts(instant);
-      const part = (type: Intl.DateTimeFormatPartTypes) =>
-        parts.find((item) => item.type === type)?.value;
-      const localTime = `${part("year")}-${part("month")}-${part("day")}T${part("hour")}:${part("minute")}:${part("second")}`;
-      return localTime === value.slice(0, 19);
-    },
-    { message: "Date and time must match the Asia/Kolkata local time." },
+    (value) => Number.isFinite(Date.parse(value)),
+    "Use a valid calendar date and time with an offset or Z.",
   );
+
+// Partner values remain display names, preserving the existing couple structure.
+export const partnerSchema = text("Partner name", 80);
+export const coupleSchema = z.object({
+  partnerOne: partnerSchema,
+  partnerTwo: partnerSchema,
+});
+export const focalPositionSchema = z.object({
+  x: z.number().min(0).max(1),
+  y: z.number().min(0).max(1),
+});
+export const invitationImageSchema = z.object({
+  src: webUrl("Image URL"),
+  alt: text("Image description", 240),
+  caption: optionalText("Image caption", 500),
+  focalPosition: focalPositionSchema.optional(),
+});
 
 export const weddingVenueSchema = z.object({
   name: text("Venue name", 120),
   address: text("Venue address", 240),
   mapsUrl: webUrl("Map URL"),
 });
-
 export const weddingEventSchema = z.object({
+  id: text("Event ID", 100),
   title: text("Event name", 100),
-  startsAt: kolkataDateTime,
-  venue: weddingVenueSchema.optional(),
-  location: text("Event location", 240).optional(),
-  dressCode: text("Dress code", 100).optional(),
-  description: text("Ceremony description", 500).optional(),
+  startsAt: eventDateTime,
+  venue: weddingVenueSchema,
+  location: optionalText("Event location", 240),
+  description: optionalText("Ceremony description", 500),
+  dressCode: optionalText("Dress code", 100),
 });
+export const invitationSchema = z
+  .object({
+    couple: coupleSchema,
+    timeZone: timeZoneSchema,
+    welcomeNote: optionalText("Welcome note", 500),
+    hosts: z.array(text("Host name", 80)).max(10).optional(),
+    coverImage: invitationImageSchema.optional(),
+    gallery: z.array(invitationImageSchema).max(MAX_GALLERY_IMAGES).optional(),
+    events: z
+      .array(weddingEventSchema)
+      .min(1, "Add at least one wedding function.")
+      .max(
+        MAX_EVENTS,
+        `An invitation can include at most ${MAX_EVENTS} wedding functions.`,
+      ),
+  })
+  .superRefine((invitation, ctx) => {
+    const ids = new Set<string>();
+    invitation.events.forEach((event, index) => {
+      if (ids.has(event.id))
+        ctx.addIssue({
+          code: "custom",
+          path: ["events", index, "id"],
+          message: "Event IDs must be unique within an invitation.",
+        });
+      ids.add(event.id);
+    });
+  });
 
-export const invitationSchema = z.object({
-  couple: z.object({
-    partnerOne: text("First couple name", 80),
-    partnerTwo: text("Second couple name", 80),
-  }),
-  welcomeNote: text("Welcome note", 500).optional(),
-  hosts: z
-    .array(text("Host name", 80))
-    .max(10, "List up to 10 hosts.")
-    .optional(),
-  coverImage: webUrl("Cover image URL"),
-  events: z
-    .array(weddingEventSchema)
-    .min(1, "Add at least one wedding function.")
-    .max(5, "An invitation can include at most 5 wedding functions."),
-}) satisfies z.ZodType<Invitation>;
-
+export type Invitation = z.infer<typeof invitationSchema>;
+export type WeddingEvent = z.infer<typeof weddingEventSchema>;
+export type WeddingVenue = z.infer<typeof weddingVenueSchema>;
+export type Partner = z.infer<typeof partnerSchema>;
+export type Couple = z.infer<typeof coupleSchema>;
+export type InvitationImage = z.infer<typeof invitationImageSchema>;
+export type FocalPosition = z.infer<typeof focalPositionSchema>;
+// Raw form input can contain blank optional text; parsing normalizes it to undefined.
 export type InvitationInput = z.input<typeof invitationSchema>;
-export type ValidatedInvitation = z.output<typeof invitationSchema>;

@@ -1,7 +1,15 @@
 import type { WeddingEvent } from "@/types/invitation";
 
+type TimelineEvent = Pick<WeddingEvent, "title" | "startsAt"> &
+  Partial<
+    Pick<
+      WeddingEvent,
+      "id" | "venue" | "location" | "dressCode" | "description"
+    >
+  >;
+
 type EventTimelineProps = {
-  events: readonly WeddingEvent[];
+  events: readonly TimelineEvent[];
   timeZone?: string;
   locale?: string;
 };
@@ -47,7 +55,7 @@ export function EventTimeline({
 
             return (
               <li
-                key={`${event.startsAt}-${index}`}
+                key={event.id ?? `${event.startsAt}-${index}`}
                 className="grid gap-4 py-7 sm:grid-cols-[8rem_1fr] sm:gap-8 sm:py-9"
               >
                 <div className="text-sm leading-6 text-muted sm:pt-1">

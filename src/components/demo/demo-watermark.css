@@ -1,0 +1,25 @@
+.yugma-demo-watermark {
+  background: #2e3a2f;
+  color: #ede7db;
+  text-align: center;
+  padding: 0.75rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  pointer-events: none;
+}
+.yugma-demo-badge {
+  position: fixed;
+  top: 50%;
+  right: 3px;
+  transform: translateY(-50%);
+  writing-mode: vertical-rl;
+  z-index: 10;
+  background: #2e3a2f;
+  color: #ede7db;
+  padding: 0.6rem 0.15rem;
+  border: 1px solid #a7b097;
+  border-radius: 2px;
+  font-size: 0.65rem;
+  pointer-events: none;
+}

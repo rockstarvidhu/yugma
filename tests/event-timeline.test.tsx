@@ -1,9 +1,8 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { EventTimeline } from "@/components/invitation/EventTimeline";
-import type { WeddingEvent } from "@/types/invitation";
 
-const events: WeddingEvent[] = [
+const events = [
   {
     title: "Haldi",
     startsAt: "2027-11-19T10:00:00+05:30",
