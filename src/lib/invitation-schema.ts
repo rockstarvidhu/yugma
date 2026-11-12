@@ -77,6 +77,8 @@ export const weddingEventSchema = z.object({
   title: text("Event name", 100),
   startsAt: eventDateTime,
   venue: weddingVenueSchema,
+  location: optionalText("Event location", 240),
+  description: optionalText("Ceremony description", 500),
   dressCode: optionalText("Dress code", 100),
 });
 export const invitationSchema = z

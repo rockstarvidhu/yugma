@@ -64,6 +64,24 @@ describe("canonical invitation contract", () => {
     }
     expect(invitationSchema.parse(multiEventInvitation).events).toHaveLength(3);
   });
+  it("supports optional event location and ceremony description", () => {
+    const event = base().events[0];
+    expect(
+      weddingEventSchema.safeParse({
+        ...event,
+        location: "",
+        description: " Family welcomes guests for the ceremony. ",
+      }).data,
+    ).toMatchObject({
+      id: event.id,
+      location: undefined,
+      description: "Family welcomes guests for the ceremony.",
+    });
+    expect(
+      weddingEventSchema.safeParse({ ...event, description: "D".repeat(501) })
+        .success,
+    ).toBe(false);
+  });
   it.each(["couple", "timeZone", "events"])("requires %s", (key) => {
     expect(
       invitationSchema.safeParse({ ...base(), [key]: undefined }).success,
