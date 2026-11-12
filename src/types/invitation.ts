@@ -9,8 +9,10 @@ export type WeddingVenue = {
 export type WeddingEvent = {
   title: string;
   startsAt: string;
-  venue: WeddingVenue;
+  venue?: WeddingVenue;
+  location?: string;
   dressCode?: string;
+  description?: string;
 };
 
 export type Invitation = {

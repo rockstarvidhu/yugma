@@ -53,8 +53,10 @@ export const weddingVenueSchema = z.object({
 export const weddingEventSchema = z.object({
   title: text("Event name", 100),
   startsAt: kolkataDateTime,
-  venue: weddingVenueSchema,
+  venue: weddingVenueSchema.optional(),
+  location: text("Event location", 240).optional(),
   dressCode: text("Dress code", 100).optional(),
+  description: text("Ceremony description", 500).optional(),
 });
 
 export const invitationSchema = z.object({
