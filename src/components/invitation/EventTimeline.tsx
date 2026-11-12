@@ -18,6 +18,10 @@ export function EventTimeline({
   className,
 }: EventTimelineProps) {
   const headingId = useId();
+  // Stable sorting preserves invitation order for events at the same instant.
+  const orderedEvents = [...events].sort(
+    (first, second) => Date.parse(first.startsAt) - Date.parse(second.startsAt),
+  );
   const dateFormatter = new Intl.DateTimeFormat(locale, {
     weekday: "long",
     day: "numeric",
@@ -44,10 +48,13 @@ export function EventTimeline({
           >
             Celebrate with us
           </h2>
+          <p className="mt-2 text-sm leading-6 text-muted [overflow-wrap:anywhere]">
+            All times shown in {timeZone}
+          </p>
         </header>
 
         <ol className="divide-y divide-border/70 border-y border-border/70">
-          {events.map((event) => {
+          {orderedEvents.map((event) => {
             const startsAt = new Date(event.startsAt);
             const { name, address, mapsUrl } = event.venue;
             const directions =

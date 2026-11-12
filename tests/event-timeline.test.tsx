@@ -1,7 +1,6 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { EventTimeline } from "@/components/invitation/EventTimeline";
-
 import { weddingEventSchema } from "@/lib/invitation-schema";
 
 afterEach(cleanup);
@@ -37,7 +36,7 @@ const events = weddingEventSchema.array().parse([
 ]);
 
 describe("EventTimeline", () => {
-  it("renders events in input order with local dates and times", () => {
+  it("renders event details with local dates and times", () => {
     render(<EventTimeline events={events} timeZone="Asia/Kolkata" />);
 
     const list = screen.getByRole("list");
@@ -61,6 +60,49 @@ describe("EventTimeline", () => {
     expect(
       within(list).getAllByText("Saturday, 20 November 2027"),
     ).toHaveLength(2);
+  });
+
+  it("sorts frozen, unsorted events by instant across UTC offsets", () => {
+    const unsorted = Object.freeze(
+      weddingEventSchema
+        .array()
+        .parse([
+          { ...events[0], title: "Later", startsAt: "2027-12-12T21:00:00Z" },
+          {
+            ...events[1],
+            title: "Earlier",
+            startsAt: "2027-12-12T23:00:00+05:30",
+          },
+          { ...events[2], title: "Middle", startsAt: "2027-12-12T20:00:00Z" },
+        ])
+        .map((event) => Object.freeze(event)),
+    );
+    const before = JSON.stringify(unsorted);
+
+    render(<EventTimeline events={unsorted} timeZone="Asia/Kolkata" />);
+
+    expect(
+      within(screen.getByRole("list"))
+        .getAllByRole("heading", { level: 3 })
+        .map((heading) => heading.textContent),
+    ).toEqual(["Earlier", "Middle", "Later"]);
+    expect(JSON.stringify(unsorted)).toBe(before);
+  });
+
+  it("keeps input order for equal instants expressed with different offsets", () => {
+    const tied = weddingEventSchema.array().parse([
+      { ...events[2], startsAt: "2027-12-12T23:30:00+05:30" },
+      { ...events[0], startsAt: "2027-12-12T17:00:00Z" },
+      { ...events[1], startsAt: "2027-12-12T18:00:00Z" },
+    ]);
+
+    render(<EventTimeline events={tied} timeZone="Asia/Kolkata" />);
+
+    expect(
+      within(screen.getByRole("list"))
+        .getAllByRole("heading", { level: 3 })
+        .map((heading) => heading.textContent),
+    ).toEqual(["Haldi", "Reception", "Wedding ceremony"]);
   });
 
   it("omits absent optional event details", () => {
@@ -100,6 +142,9 @@ describe("EventTimeline", () => {
       />,
     );
 
+    expect(
+      screen.getAllByText("All times shown in America/New_York"),
+    ).toHaveLength(1);
     expect(screen.getByText(/^11:30 pm$/i)).toBeInTheDocument();
     expect(screen.getByText("Thursday, November 18, 2027")).toBeInTheDocument();
   });
