@@ -45,12 +45,12 @@ describe("template registry and renderer", () => {
       ...shellDemoInvitation,
       couple: { partnerOne: "Alex", partnerTwo: "Sam" },
       welcomeNote: "Our own welcome",
-      timeZone: "UTC",
+      timeZone: "Asia/Kolkata",
       events: [
         {
           id: "new",
           title: "An evening together",
-          startsAt: "2027-12-12T12:00:00Z",
+          startsAt: "2027-12-12T22:00:00Z",
           venue: {
             name: "Orchid House",
             address: "Fictional address",
@@ -60,7 +60,7 @@ describe("template registry and renderer", () => {
         {
           id: "second",
           title: "Morning gathering",
-          startsAt: "2027-12-13T10:00:00Z",
+          startsAt: "2027-12-14T10:00:00Z",
           venue: {
             name: "Garden Court",
             address: "Another fictional address",
@@ -86,9 +86,9 @@ describe("template registry and renderer", () => {
     expect(screen.getByText("Orchid House")).toBeInTheDocument();
     expect(screen.getByText("Fictional address")).toBeInTheDocument();
     expect(
-      screen.getByText(/12 December 2027/).closest("time"),
-    ).toHaveAttribute("datetime", "2027-12-12T12:00:00Z");
-    expect(screen.getByText(/12 December 2027/)).toHaveTextContent("12:00");
+      screen.getByText("Monday, 13 December 2027").closest("time"),
+    ).toHaveAttribute("datetime", "2027-12-12T22:00:00Z");
+    expect(screen.getByText("3:30 am")).toBeVisible();
   });
   it("renders an invitation with a long name and no welcome note or photos", () => {
     const longName = "A".repeat(80);
@@ -138,6 +138,15 @@ describe("template registry and renderer", () => {
     expect(
       screen.getByRole("link", { name: /The celebration/ }),
     ).toHaveAttribute("href", "#celebration");
+    const directions = screen.getByRole("link", {
+      name: /get directions to the marigold courtyard/i,
+    });
+    expect(directions).toHaveAttribute(
+      "href",
+      shellDemoInvitation.events[0].venue.mapsUrl,
+    );
+    expect(directions).toHaveAttribute("target", "_blank");
+    expect(directions).toHaveAttribute("rel", "noopener noreferrer");
     expect(metadata.robots).toEqual({ index: false, follow: false });
   });
   it("does not couple demo branding to the core renderer", () => {
