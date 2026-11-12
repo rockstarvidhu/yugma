@@ -1,3 +1,4 @@
+import { demoCoverPhotoUrl } from "@/lib/cover-photo";
 import { invitationSchema } from "@/lib/invitation-schema";
 import type { InvitationInput } from "@/types/invitation";
 
@@ -10,7 +11,7 @@ export const shellDemoInvitation = invitationSchema.parse({
   // Photo by Sabesh Photography LTD, used under the Unsplash License:
   // https://unsplash.com/photos/couple-in-traditional-indian-wedding-attire-in-a-garden-RIOegGLaUbE
   coverImage: {
-    src: "https://images.unsplash.com/photo-1754782540893-2122877f2975?auto=format&fit=crop&w=2400&q=80",
+    src: demoCoverPhotoUrl,
     alt: "A couple in traditional Indian wedding attire in a garden",
     focalPosition: { x: 0.5, y: 0.42 },
   },

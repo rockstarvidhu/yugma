@@ -1,4 +1,5 @@
-import Image from "next/image";
+import { CoverPhoto } from "./CoverPhoto";
+import { resolveCoverPhoto } from "@/lib/cover-photo";
 import type { Invitation } from "@/types/invitation";
 
 type CoverProps = {
@@ -7,30 +8,19 @@ type CoverProps = {
 };
 
 export function Cover({ invitation, detailsId = "celebration" }: CoverProps) {
-  const firstEvent = invitation.events[0];
+  // The schema has no primary event. Show when the celebrations begin.
+  const firstStart = Math.min(
+    ...invitation.events.map(({ startsAt }) => Date.parse(startsAt)),
+  );
+  const coverPhoto = resolveCoverPhoto(invitation.coverImage);
   const weddingDate = new Intl.DateTimeFormat("en-IN", {
     dateStyle: "full",
     timeZone: invitation.timeZone,
-  }).format(new Date(firstEvent.startsAt));
+  }).format(firstStart);
 
   return (
     <header className="heirloom-cover">
-      {invitation.coverImage && (
-        <Image
-          className="heirloom-cover__image"
-          src={invitation.coverImage.src}
-          alt={invitation.coverImage.alt}
-          fill
-          preload
-          sizes="100vw"
-          quality={85}
-          style={{
-            objectPosition: invitation.coverImage.focalPosition
-              ? `${invitation.coverImage.focalPosition.x * 100}% ${invitation.coverImage.focalPosition.y * 100}%`
-              : "center",
-          }}
-        />
-      )}
+      {coverPhoto && <CoverPhoto key={coverPhoto.src} photo={coverPhoto} />}
       <div className="heirloom-cover__veil" aria-hidden="true" />
 
       <div className="heirloom-cover__content">
@@ -43,7 +33,12 @@ export function Cover({ invitation, detailsId = "celebration" }: CoverProps) {
         <p className="heirloom-cover__welcome">
           {invitation.welcomeNote ?? "Join us as we begin our life together."}
         </p>
-        <p className="heirloom-cover__date">{weddingDate}</p>
+        <p className="heirloom-cover__date">
+          {invitation.events.length > 1 && "Celebrations begin "}
+          <time dateTime={new Date(firstStart).toISOString()}>
+            {weddingDate}
+          </time>
+        </p>
       </div>
 
       <a className="heirloom-cover__scroll" href={`#${detailsId}`}>
