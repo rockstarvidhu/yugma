@@ -1,4 +1,6 @@
 import type { InvitationTemplateProps } from "../types";
+import { Cover } from "@/components/invitation/Cover";
+import "../heirloom/heirloom.css";
 import "./afterglow.css";
 
 export function Afterglow({ invitation }: InvitationTemplateProps) {
@@ -12,26 +14,7 @@ export function Afterglow({ invitation }: InvitationTemplateProps) {
   });
   return (
     <main className="afterglow-invitation">
-      {/* TODO(afterglow): envelope opening and cinematic reveals belong inside this template. */}
-      <header className="afterglow-cover">
-        <p className="afterglow-eyebrow">
-          Afterglow · A celebration of togetherness
-        </p>
-        <span className="afterglow-ornament" aria-hidden="true">
-          ✧
-        </span>
-        <h1>
-          {invitation.couple.partnerOne}{" "}
-          <span className="afterglow-ampersand">&amp;</span>{" "}
-          {invitation.couple.partnerTwo}
-        </h1>
-        {invitation.welcomeNote && (
-          <p className="afterglow-welcome">{invitation.welcomeNote}</p>
-        )}
-        <a className="afterglow-link" href="#celebration">
-          The celebration <span aria-hidden="true">↓</span>
-        </a>
-      </header>
+      <Cover invitation={invitation} />
       {/* TODO(afterglow): future scroll-driven florals and photo interactions stay template-local. */}
       <section
         className="afterglow-celebration"

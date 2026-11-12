@@ -7,6 +7,13 @@ export const shellDemoInvitation = invitationSchema.parse({
   welcomeNote:
     "With full hearts and our favourite people, we begin a new chapter. Join us for a day of love, laughter and togetherness.",
   timeZone: "Asia/Kolkata",
+  // Photo by Sabesh Photography LTD, used under the Unsplash License:
+  // https://unsplash.com/photos/couple-in-traditional-indian-wedding-attire-in-a-garden-RIOegGLaUbE
+  coverImage: {
+    src: "https://images.unsplash.com/photo-1754782540893-2122877f2975?auto=format&fit=crop&w=2400&q=80",
+    alt: "A couple in traditional Indian wedding attire in a garden",
+    focalPosition: { x: 0.5, y: 0.42 },
+  },
   events: [
     {
       id: "demo-celebration",

@@ -85,10 +85,9 @@ describe("template registry and renderer", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Orchid House")).toBeInTheDocument();
     expect(screen.getByText("Fictional address")).toBeInTheDocument();
-    expect(
-      screen.getByText(/12 December 2027/).closest("time"),
-    ).toHaveAttribute("datetime", "2027-12-12T12:00:00Z");
-    expect(screen.getByText(/12 December 2027/)).toHaveTextContent("12:00");
+    const eventTime = document.querySelector(".afterglow-event time");
+    expect(eventTime).toHaveAttribute("datetime", "2027-12-12T12:00:00Z");
+    expect(eventTime).toHaveTextContent("12:00");
   });
   it("renders an invitation with a long name and no welcome note or photos", () => {
     const longName = "A".repeat(80);
@@ -96,6 +95,7 @@ describe("template registry and renderer", () => {
       ...shellDemoInvitation,
       couple: { partnerOne: longName, partnerTwo: "Sam" },
       welcomeNote: undefined,
+      coverImage: undefined,
     });
 
     const { container } = render(
@@ -136,7 +136,7 @@ describe("template registry and renderer", () => {
       "Tara & Neel",
     );
     expect(
-      screen.getByRole("link", { name: /The celebration/ }),
+      screen.getByRole("link", { name: /Explore the celebration/ }),
     ).toHaveAttribute("href", "#celebration");
     expect(metadata.robots).toEqual({ index: false, follow: false });
   });
