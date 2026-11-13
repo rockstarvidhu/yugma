@@ -1,5 +1,5 @@
 import { invitationSchema } from "@/lib/invitation-schema";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { Afterglow } from "./afterglow/Afterglow";
 import { createTemplateRegistry, templateRegistry } from "./registry";
@@ -139,9 +139,19 @@ describe("template registry and renderer", () => {
       "Tara & Neel",
     );
     expect(
-      screen.getByRole("link", { name: /The celebration/ }),
+      screen.getByRole("link", { name: "Celebration schedule" }),
     ).toHaveAttribute("href", "#celebration");
-    const directions = screen.getByRole("link", {
+    expect(
+      screen.getByRole("link", { name: "Venue information" }),
+    ).toHaveAttribute("href", "#venues");
+    const venueSection = screen.getByRole("region", { name: "Wedding venues" });
+    expect(venueSection).toHaveAttribute("id", "venues");
+    const schedule = screen.getByRole("region", { name: "Celebrate with us" });
+    expect(schedule).toHaveAttribute("id", "celebration");
+    expect(
+      within(schedule).queryByRole("link", { name: /Get Directions/i }),
+    ).toBeNull();
+    const directions = within(venueSection).getByRole("link", {
       name: /get directions to the marigold courtyard/i,
     });
     expect(directions).toHaveAttribute(

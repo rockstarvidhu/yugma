@@ -10,6 +10,7 @@
 }
 .afterglow-cover,
 .afterglow-celebration,
+.afterglow-venues,
 .afterglow-invitation .invitation-story,
 .afterglow-invitation .invitation-closing {
   max-width: 56rem;
@@ -48,20 +49,8 @@
   font-size: 0.65em;
   margin: 0.25em 0;
 }
-.afterglow-link {
-  display: inline-flex;
-  gap: 1rem;
-  align-items: center;
-  min-height: 44px;
-  padding: 0.5rem;
-  text-underline-offset: 0.4em;
-  text-decoration: underline;
-}
-.afterglow-link:focus-visible {
-  outline: 2px solid currentColor;
-  outline-offset: 4px;
-}
-.afterglow-celebration {
+.afterglow-celebration,
+.afterglow-venues {
   --heading: var(--afterglow-burgundy);
   --foreground: var(--afterglow-burgundy);
   --muted: #62453f;
@@ -69,6 +58,27 @@
   padding: 3rem 0;
   border-top: 1px solid var(--afterglow-gold);
   scroll-margin-top: 2rem;
+}
+.afterglow-venue-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  gap: 1rem;
+  max-width: 48rem;
+  margin: 0 auto;
+  text-align: left;
+}
+.afterglow-venue-list > li {
+  border: 1px solid var(--afterglow-gold);
+  padding: 0.75rem 1.25rem 1.25rem;
+  min-width: 0;
+}
+.afterglow-venue-events {
+  border-top: 1px solid var(--afterglow-gold);
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.65;
 }
 .afterglow-invitation h2 {
   font-size: clamp(2rem, 5vw, 3rem);

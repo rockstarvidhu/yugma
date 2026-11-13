@@ -135,8 +135,17 @@ describe("Afterglow notes", () => {
     ).toBeTruthy();
     expect(within(story).getByText(message)).toBeVisible();
     expect(closing).toBeVisible();
+    const venues = screen.getByRole("region", { name: "Wedding venues" });
     expect(
-      within(schedule).getByRole("link", { name: /Get Directions/ }),
+      schedule.compareDocumentPosition(venues) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      venues.compareDocumentPosition(closing) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      within(venues).getByRole("link", { name: /Get Directions/ }),
     ).toBeVisible();
     expect(screen.getByText("The families of Tara and Neel")).toBeVisible();
   });
