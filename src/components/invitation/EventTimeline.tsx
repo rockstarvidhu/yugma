@@ -1,5 +1,5 @@
 import { useId } from "react";
-import { weddingVenueSchema } from "@/lib/invitation-schema";
+import { VenueCard } from "./VenueCard";
 import type { Invitation, WeddingEvent } from "@/types/invitation";
 
 type EventTimelineProps = {
@@ -56,10 +56,6 @@ export function EventTimeline({
         <ol className="divide-y divide-border/70 border-y border-border/70">
           {orderedEvents.map((event) => {
             const startsAt = new Date(event.startsAt);
-            const { name, address, mapsUrl } = event.venue;
-            const directions =
-              weddingVenueSchema.shape.mapsUrl.safeParse(mapsUrl);
-
             return (
               <li
                 key={event.id}
@@ -77,17 +73,7 @@ export function EventTimeline({
                   <h3 className="break-words font-editorial text-2xl leading-snug text-heading sm:text-[1.75rem]">
                     {event.title}
                   </h3>
-                  <p className="mt-2 text-sm font-medium leading-6 text-foreground">
-                    {name}
-                  </p>
-                  <p className="mt-0.5 text-sm leading-6 text-muted">
-                    {address}
-                  </p>
-                  {event.location && event.location !== name && (
-                    <p className="mt-0.5 text-sm leading-6 text-muted">
-                      {event.location}
-                    </p>
-                  )}
+                  <VenueCard venue={event.venue} location={event.location} />
                   {event.description && (
                     <p className="mt-3 text-sm leading-6 text-muted">
                       {event.description}
@@ -98,17 +84,6 @@ export function EventTimeline({
                       <span className="font-medium text-heading">Attire:</span>{" "}
                       {event.dressCode}
                     </p>
-                  )}
-                  {directions.success && (
-                    <a
-                      aria-label={`Get Directions to ${name} (opens in a new tab)`}
-                      href={directions.data}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-heading underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4"
-                    >
-                      Get Directions
-                    </a>
                   )}
                 </div>
               </li>
