@@ -6,6 +6,9 @@ export const shellDemoInvitation = invitationSchema.parse({
   couple: { partnerOne: "Tara", partnerTwo: "Neel" },
   welcomeNote:
     "With full hearts and our favourite people, we begin a new chapter. Join us for a day of love, laughter and togetherness.",
+  closingNote:
+    "We can't wait to share a meal, a dance and the start of this next chapter with you.",
+  hosts: ["The families of Tara and Neel"],
   timeZone: "Asia/Kolkata",
   events: [
     {
