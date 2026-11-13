@@ -2,6 +2,7 @@ import { ClosingNote } from "@/components/invitation/ClosingNote";
 import { StoryNote } from "@/components/invitation/StoryNote";
 import { QuickLinks } from "@/components/invitation/QuickLinks";
 import { VenueCard } from "@/components/invitation/VenueCard";
+import { venueIdentity } from "@/lib/venue-identity";
 import type { WeddingEvent } from "@/types/invitation";
 import { EventTimeline } from "@/components/invitation/EventTimeline";
 import type { InvitationTemplateProps } from "../types";
@@ -10,8 +11,7 @@ import "./afterglow.css";
 export function Afterglow({ invitation }: InvitationTemplateProps) {
   const eventsByVenue = new Map<string, WeddingEvent[]>();
   for (const event of invitation.events) {
-    const { name, address, mapsUrl } = event.venue;
-    const key = JSON.stringify([name, address, mapsUrl]);
+    const key = venueIdentity(event.venue);
     const events = eventsByVenue.get(key);
     if (events) events.push(event);
     else eventsByVenue.set(key, [event]);

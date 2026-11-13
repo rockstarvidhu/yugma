@@ -6,6 +6,7 @@ import { VenueCard } from "@/components/invitation/VenueCard";
 import { Afterglow } from "@/templates/afterglow/Afterglow";
 import { shellDemoInvitation } from "@/templates/internal/demo-invitation";
 import { invitationSchema, weddingEventSchema } from "@/lib/invitation-schema";
+import { venueIdentity } from "@/lib/venue-identity";
 
 afterEach(cleanup);
 
@@ -25,7 +26,7 @@ describe("VenueCard", () => {
     expect(screen.getByText("North entrance")).toBeVisible();
     expect(screen.getByText("Dinner")).toBeVisible();
     const link = screen.getByRole("link", {
-      name: /Get Directions to Cedar Hall for Dinner/,
+      name: /Get Directions to Cedar Hall, Jaipur, Rajasthan for Dinner/,
     });
     expect(link).toHaveAttribute("href", venue.mapsUrl);
     expect(link).toHaveAttribute("target", "_blank");
@@ -172,4 +173,121 @@ it("lists shared venue details and directions once and associates every event wi
   expect(schedule.getByText("All times shown in Asia/Kolkata")).toBeVisible();
   expect(schedule.queryByRole("link", { name: /Get Directions/ })).toBeNull();
   expect(schedule.queryByText("North entrance")).toBeNull();
+});
+
+describe("venue identity", () => {
+  const baseMap =
+    "https://www.google.com/maps/dir/?api=1&destination=9.9%2C76.2&destination_place_id=cedar";
+
+  it.each([
+    [baseMap, baseMap],
+    [`${baseMap}&utm_source=email`, `${baseMap}&utm_source=chat`],
+    [
+      `${baseMap}&utm_campaign=wedding&utm_source=email&gclid=1`,
+      `${baseMap}&utm_medium=message&UTM_content=card&fbclid=2`,
+    ],
+    [
+      "https://www.google.com/maps/dir/?utm_source=email&api=1&destination=9.9%2C76.2&utm_campaign=weekend&destination_place_id=cedar",
+      `${baseMap}&utm_campaign=weekend&utm_source=email`,
+    ],
+  ])(
+    "consolidates equivalent destinations and retains the first original link (%#)",
+    (firstUrl, secondUrl) => {
+      const firstEvent = shellDemoInvitation.events[0];
+      const invitation = invitationSchema.parse({
+        ...shellDemoInvitation,
+        events: [
+          {
+            ...firstEvent,
+            id: "later",
+            title: "Dinner",
+            startsAt: "2027-12-12T18:00:00Z",
+            venue: { ...venue, mapsUrl: firstUrl },
+          },
+          {
+            ...firstEvent,
+            id: "earlier",
+            title: "Ceremony",
+            startsAt: "2027-12-12T23:00:00+05:30",
+            venue: { ...venue, mapsUrl: secondUrl },
+          },
+        ],
+      });
+      for (const event of invitation.events) {
+        Object.freeze(event.venue);
+        Object.freeze(event);
+      }
+      Object.freeze(invitation.events);
+      Object.freeze(invitation);
+      const before = JSON.stringify(invitation);
+
+      render(<Afterglow invitation={invitation} />);
+
+      const venues = within(
+        screen.getByRole("region", { name: "Wedding venues" }),
+      );
+      expect(venues.getAllByText(venue.address)).toHaveLength(1);
+      expect(venues.getByText("Ceremony")).toBeVisible();
+      expect(venues.getByText("Dinner")).toBeVisible();
+      const links = venues.getAllByRole("link", { name: /Get Directions/i });
+      expect(links).toHaveLength(1);
+      expect(links[0]).toHaveAttribute("href", firstUrl);
+      const timeline = screen.getByRole("region", {
+        name: "Celebrate with us",
+      });
+      expect(
+        [...timeline.querySelectorAll("time")].map((time) => time.dateTime),
+      ).toEqual(["2027-12-12T23:00:00+05:30", "2027-12-12T18:00:00Z"]);
+      expect(JSON.stringify(invitation)).toBe(before);
+    },
+  );
+
+  it.each([
+    baseMap.replace("destination_place_id=cedar", "destination_place_id=other"),
+    baseMap.replace("9.9%2C76.2", "10.1%2C76.3"),
+    baseMap.replace("/maps/dir/", "/maps/search/"),
+    `${baseMap}#entrance`,
+  ])("keeps different map destinations separate (%s)", (mapsUrl) => {
+    expect(venueIdentity({ ...venue, mapsUrl })).not.toBe(
+      venueIdentity({ ...venue, mapsUrl: baseMap }),
+    );
+  });
+
+  it("shows separate same-name venue cards and names their directions by address", () => {
+    const event = shellDemoInvitation.events[0];
+    const first = { ...venue, address: "Kochi Road", mapsUrl: baseMap };
+    const second = {
+      ...venue,
+      address: "Beach Road",
+      mapsUrl: `${baseMap}&utm_source=email`,
+    };
+    const invitation = invitationSchema.parse({
+      ...shellDemoInvitation,
+      events: [
+        { ...event, id: "road", venue: first },
+        { ...event, id: "beach", venue: second },
+      ],
+    });
+    render(<Afterglow invitation={invitation} />);
+    const venues = within(
+      screen.getByRole("region", { name: "Wedding venues" }),
+    );
+    for (const place of [first, second]) {
+      expect(venues.getByText(place.address)).toBeVisible();
+      expect(
+        venues.getByRole("link", {
+          name: `Get Directions to Cedar Hall, ${place.address} (opens in a new tab)`,
+        }),
+      ).toHaveAttribute("href", place.mapsUrl);
+    }
+    expect(venues.getAllByRole("link")).toHaveLength(2);
+  });
+
+  it("compares missing and blank map URLs consistently without conflating them with a destination", () => {
+    const { name, address } = venue;
+    expect(venueIdentity({ name, address })).toBe(
+      venueIdentity({ name, address, mapsUrl: " " }),
+    );
+    expect(venueIdentity({ name, address })).not.toBe(venueIdentity(venue));
+  });
 });

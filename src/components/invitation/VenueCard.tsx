@@ -11,7 +11,7 @@ type VenueCardProps = {
 export function VenueCard({ venue, location, eventTitle }: VenueCardProps) {
   const { name, address, mapsUrl } = venue;
   const directions = weddingVenueSchema.shape.mapsUrl.safeParse(mapsUrl);
-  const destination = eventTitle ? `${name} for ${eventTitle}` : name;
+  const destination = `${name}, ${address}${eventTitle ? ` for ${eventTitle}` : ""}`;
 
   return (
     <div className="mt-2 min-w-0 text-sm leading-6 [overflow-wrap:anywhere]">
