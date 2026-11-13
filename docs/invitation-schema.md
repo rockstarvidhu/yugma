@@ -46,9 +46,9 @@ protocol and credentials, not remote availability, image content or server-side
 fetch safety. Map URLs follow the same URL policy. Usernames/passwords and
 javascript/data/file URLs are rejected.
 
-Blank/whitespace-only welcome notes, dress codes and captions normalize to
+Blank/whitespace-only welcome notes, closing notes, dress codes and captions normalize to
 `undefined`. Required strings remain non-empty. Optional objects/arrays should be
-omitted rather than sent as empty strings or null. Welcome text is limited to 500
+omitted rather than sent as empty strings or null. Welcome and closing notes are each limited to 500
 characters, dress codes to 100, and hosts to 10 names of up to 80 characters.
 
 ## Migration and fixtures

@@ -96,6 +96,8 @@ describe("template registry and renderer", () => {
       ...shellDemoInvitation,
       couple: { partnerOne: longName, partnerTwo: "Sam" },
       welcomeNote: undefined,
+      closingNote: undefined,
+      hosts: undefined,
     });
 
     const { container } = render(
@@ -104,7 +106,8 @@ describe("template registry and renderer", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       `${longName} & Sam`,
     );
-    expect(container.querySelector(".afterglow-welcome")).toBeNull();
+    expect(container.querySelector(".invitation-story")).toBeNull();
+    expect(container.querySelector(".invitation-closing")).toBeNull();
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
   it("renders another registered component without renderer changes", () => {
