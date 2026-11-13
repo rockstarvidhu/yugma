@@ -10,7 +10,8 @@
 }
 .afterglow-cover,
 .afterglow-celebration,
-.afterglow-closing {
+.afterglow-invitation .invitation-story,
+.afterglow-invitation .invitation-closing {
   max-width: 56rem;
   margin: auto;
   text-align: center;
@@ -47,11 +48,6 @@
   font-size: 0.65em;
   margin: 0.25em 0;
 }
-.afterglow-welcome {
-  max-width: 32rem;
-  margin: 2rem auto;
-  line-height: 1.9;
-}
 .afterglow-link {
   display: inline-flex;
   gap: 1rem;
@@ -79,11 +75,41 @@
   line-height: 1.3;
   margin: 1rem 0 2rem;
 }
-.afterglow-closing {
-  padding: 1rem 0 6rem;
+.afterglow-invitation .invitation-story {
+  padding: 1rem 0 3rem;
 }
-.afterglow-closing p {
-  line-height: 1.8;
+.afterglow-invitation .invitation-closing {
+  border-top: 1px solid var(--afterglow-gold);
+  padding: 2rem 0 6rem;
+}
+.afterglow-invitation .invitation-note-copy {
+  max-width: 36rem;
+  margin: 0 auto;
+  line-height: 1.85;
+  white-space: pre-line;
+}
+.afterglow-invitation .invitation-story-photo {
+  max-width: 36rem;
+  margin: 1.5rem auto 0;
+}
+.afterglow-invitation .invitation-story-frame {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: #eadbc4;
+}
+.afterglow-invitation .invitation-story-frame img {
+  object-fit: cover;
+}
+.afterglow-invitation .invitation-story-photo figcaption {
+  margin-top: 0.75rem;
+  color: #62453f;
+  font-size: 0.875rem;
+}
+.afterglow-invitation .invitation-closing-hosts {
+  margin-top: 1.25rem;
+  line-height: 1.7;
+  font-weight: 600;
 }
 @media (min-width: 48rem) {
   .afterglow-cover {

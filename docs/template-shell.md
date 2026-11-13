@@ -22,3 +22,19 @@ Publishing access must be authorized on the server.
 
 Future envelope, scroll/floral and gallery effects belong in Afterglow, at its
 TODO markers, with reduced-motion and keyboard support. They are out of scope here.
+
+## Afterglow story and closing
+
+The current sequence is cover, personal note, celebration timeline, and closing.
+The personal note renders the existing welcome message and optionally a photo
+from the gallery. Supply an absolute URL on the configured `SITE_URL` (or Vercel
+production origin) for a curated local raster asset at
+`/media/invitations/<name>.<ext>`. Deploy the file under `public/media/invitations/`.
+Supported extensions are AVIF, JPG, JPEG, PNG, and WebP. Other sources are omitted,
+and a failed load leaves the text-only layout. The cover image stays separate.
+
+The closing uses optional `closingNote` and `hosts`; it is omitted when both are
+absent. When PR #6 lands, use its cover as the first section and keep the personal
+note, timeline, and closing in order. Display the welcome message in the personal
+note only to avoid duplicating it in the Heirloom cover. Cover media handling is
+independent of the story gallery policy.
