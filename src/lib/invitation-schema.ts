@@ -70,7 +70,7 @@ export const invitationImageSchema = z.object({
 export const weddingVenueSchema = z.object({
   name: text("Venue name", 120),
   address: text("Venue address", 240),
-  mapsUrl: webUrl("Map URL"),
+  mapsUrl: webUrl("Map URL").optional(),
 });
 export const weddingEventSchema = z.object({
   id: text("Event ID", 100),

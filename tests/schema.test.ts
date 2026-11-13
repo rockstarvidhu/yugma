@@ -101,7 +101,14 @@ describe("canonical invitation contract", () => {
         .success,
     ).toBe(false);
   });
-  it.each(["name", "address", "mapsUrl"])("requires venue %s", (key) => {
+  it("accepts a venue without directions and validates a supplied URL", () => {
+    const venue = { ...base().events[0].venue, mapsUrl: undefined };
+    expect(weddingVenueSchema.safeParse(venue).success).toBe(true);
+    expect(
+      weddingVenueSchema.safeParse({ ...venue, mapsUrl: "" }).success,
+    ).toBe(false);
+  });
+  it.each(["name", "address"])("requires venue %s", (key) => {
     expect(
       weddingVenueSchema.safeParse({
         ...base().events[0].venue,

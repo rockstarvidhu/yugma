@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
-import { DemoWatermark } from "@/components/preview/DemoWatermark";
-import { InvitationRenderer } from "@/invitations/renderer/InvitationRenderer";
-import { shellDemoInvitation } from "@/templates/internal/demo-invitation";
+import { DemoPreview } from "@/components/preview/DemoPreview";
 
 export const metadata: Metadata = {
   title: "Heirloom demo",
@@ -10,13 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function HeirloomDemo() {
-  return (
-    <>
-      <DemoWatermark />
-      <InvitationRenderer
-        templateId="afterglow"
-        invitation={shellDemoInvitation}
-      />
-    </>
-  );
+  return <DemoPreview />;
 }

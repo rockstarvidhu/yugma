@@ -10,7 +10,10 @@ import type { InvitationTemplateProps } from "../types";
 import "../heirloom/heirloom.css";
 import "./afterglow.css";
 
-export function Afterglow({ invitation }: InvitationTemplateProps) {
+export function Afterglow({
+  invitation,
+  trustedImageOrigin,
+}: InvitationTemplateProps) {
   const eventsByVenue = new Map<string, WeddingEvent[]>();
   for (const event of invitation.events) {
     const key = venueIdentity(event.venue);
@@ -29,12 +32,7 @@ export function Afterglow({ invitation }: InvitationTemplateProps) {
       <StoryNote
         welcomeNote={invitation.welcomeNote}
         gallery={invitation.gallery}
-        trustedImageOrigin={
-          process.env.SITE_URL ??
-          (process.env.VERCEL_PROJECT_PRODUCTION_URL
-            ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-            : undefined)
-        }
+        trustedImageOrigin={trustedImageOrigin}
       />
       {/* TODO(afterglow): future scroll-driven florals and photo interactions stay template-local. */}
       <EventTimeline

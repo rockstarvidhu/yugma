@@ -4,6 +4,7 @@ import type { InvitationTemplateProps } from "@/templates/types";
 export function InvitationRenderer({
   templateId,
   invitation,
+  trustedImageOrigin,
   registry = templateRegistry,
 }: InvitationTemplateProps & {
   templateId: string;
@@ -13,5 +14,7 @@ export function InvitationRenderer({
   if (!template)
     return <p role="status">This invitation template is unavailable.</p>;
   const Template = template.Component;
-  return <Template invitation={invitation} />;
+  return (
+    <Template invitation={invitation} trustedImageOrigin={trustedImageOrigin} />
+  );
 }
