@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DemoWatermark } from "@/components/demo/DemoWatermark";
+import { DemoWatermark } from "@/components/preview/DemoWatermark";
 import { InvitationRenderer } from "@/invitations/renderer/InvitationRenderer";
 import { shellDemoInvitation } from "@/templates/internal/demo-invitation";
 

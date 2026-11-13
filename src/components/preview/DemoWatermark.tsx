@@ -4,9 +4,12 @@ import "./demo-watermark.css";
 export function DemoWatermark() {
   return (
     <aside className="yugma-demo-watermark" aria-label="Demo preview">
-      <span>YUGMA DEMO</span>
+      <span className="yugma-demo-watermark__label">
+        YUGMA <span aria-hidden="true">•</span> DEMO
+      </span>
+      <span className="yugma-demo-watermark__note">Sample invitation</span>
       <span className="yugma-demo-badge" aria-hidden="true">
-        YUGMA DEMO
+        YUGMA • DEMO
       </span>
     </aside>
   );

@@ -6,6 +6,9 @@ import { createTemplateRegistry, templateRegistry } from "./registry";
 import { shellDemoInvitation } from "./internal/demo-invitation";
 import { InvitationRenderer } from "@/invitations/renderer/InvitationRenderer";
 import AfterglowDemo, { metadata } from "@/app/demo/afterglow/page";
+import HeirloomDemo, {
+  metadata as heirloomMetadata,
+} from "@/app/demo/heirloom/page";
 import type { InvitationTemplateProps } from "./types";
 
 afterEach(cleanup);
@@ -143,7 +146,7 @@ describe("template registry and renderer", () => {
     render(<AfterglowDemo />);
     expect(
       screen.getByRole("complementary", { name: "Demo preview" }),
-    ).toHaveTextContent("YUGMA DEMO");
+    ).toHaveTextContent("YUGMA • DEMO");
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Tara & Neel",
     );
@@ -194,6 +197,32 @@ describe("template registry and renderer", () => {
       screen.getAllByRole("link", { name: /Get Directions/i }),
     ).toHaveLength(1);
     expect(metadata.robots).toEqual({ index: false, follow: false });
+  });
+  it("serves the default sample at /demo/heirloom with a non-dismissible watermark", () => {
+    const { container } = render(<HeirloomDemo />);
+    const watermark = screen.getByRole("complementary", {
+      name: "Demo preview",
+    });
+    const template = container.querySelector(".afterglow-invitation");
+
+    expect(watermark).toHaveTextContent("YUGMA • DEMO");
+    expect(watermark).toHaveTextContent("Sample invitation");
+    expect(watermark.nextElementSibling).toBe(template);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "Tara & Neel",
+    );
+    expect(
+      screen.getByRole("link", {
+        name: /get directions to the marigold courtyard/i,
+      }),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: /close|dismiss/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /purchase|pay|unlock/i }),
+    ).not.toBeInTheDocument();
+    expect(heirloomMetadata.robots).toEqual({ index: false, follow: false });
   });
   it("does not couple demo branding to the core renderer", () => {
     render(
