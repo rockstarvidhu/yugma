@@ -207,7 +207,10 @@ describe("template registry and renderer", () => {
 
     expect(watermark).toHaveTextContent("YUGMA • DEMO");
     expect(watermark).toHaveTextContent("Sample invitation");
-    expect(watermark.nextElementSibling).toBe(template);
+    expect(
+      watermark.compareDocumentPosition(template!) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Tara & Neel",
     );

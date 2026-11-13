@@ -43,8 +43,9 @@ image objects (`MAX_GALLERY_IMAGES = 20`). Both may be absent. Each image contai
 The focal position is content metadata; crop style and animation belong to UI.
 There can be one cover plus up to 20 gallery images. Schema checks URL syntax,
 protocol and credentials, not remote availability, image content or server-side
-fetch safety. Map URLs follow the same URL policy. Usernames/passwords and
-javascript/data/file URLs are rejected.
+fetch safety. Optional map URLs follow the same URL policy. Omit the URL when
+directions are unavailable or a venue change invalidates them. Usernames,
+passwords, and javascript/data/file URLs are rejected.
 
 Blank/whitespace-only welcome notes, closing notes, dress codes and captions normalize to
 `undefined`. Required strings remain non-empty. Optional objects/arrays should be
