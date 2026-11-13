@@ -1,5 +1,15 @@
-import { useId, useState, type FormEvent } from "react";
-import { previewFields, validatePreview } from "@/lib/preview-invitation";
+import {
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
+import {
+  previewFields,
+  validatePreview,
+  type PreviewFields,
+} from "@/lib/preview-invitation";
 import type { Invitation } from "@/types/invitation";
 
 type FieldProps = {
@@ -68,6 +78,31 @@ export function PreviewForm({
   const id = useId();
   const [fields, setFields] = useState(() => previewFields(sample));
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const formRef = useRef<HTMLFormElement>(null);
+  const focusAfterSubmit = useRef(false);
+
+  useLayoutEffect(() => {
+    if (!focusAfterSubmit.current) return;
+    focusAfterSubmit.current = false;
+    formRef.current
+      ?.querySelector<HTMLElement>(
+        'input[aria-invalid="true"], textarea[aria-invalid="true"]',
+      )
+      ?.focus();
+  }, [errors]);
+
+  function updateField(key: string, next: PreviewFields) {
+    setFields(next);
+    if (!errors[key]) return;
+
+    const message = validatePreview(sample, next).errors?.[key];
+    setErrors((current) => {
+      const remaining = { ...current };
+      if (message) remaining[key] = message;
+      else delete remaining[key];
+      return remaining;
+    });
+  }
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -76,19 +111,14 @@ export function PreviewForm({
       setErrors({});
       apply(result.invitation);
     } else {
+      focusAfterSubmit.current = true;
       setErrors(result.errors);
-      const controls = event.currentTarget.querySelectorAll<
-        HTMLInputElement | HTMLTextAreaElement
-      >("input, textarea");
-      const firstInvalid = [...controls].find(
-        (control) => result.errors[control.id.slice(id.length + 1)],
-      );
-      firstInvalid?.focus();
     }
   }
 
   return (
     <form
+      ref={formRef}
       id="preview-editor"
       className="preview-form"
       aria-labelledby={`${id}-heading`}
@@ -111,7 +141,7 @@ export function PreviewForm({
             maxLength={80}
             error={errors[`couple.${key}`]}
             update={(value) =>
-              setFields((current) => ({ ...current, [key]: value }))
+              updateField(`couple.${key}`, { ...fields, [key]: value })
             }
           />
         ))}
@@ -125,7 +155,7 @@ export function PreviewForm({
         maxLength={500}
         error={errors.welcomeNote}
         update={(value) =>
-          setFields((current) => ({ ...current, welcomeNote: value }))
+          updateField("welcomeNote", { ...fields, welcomeNote: value })
         }
       />
       {sample.events.map((event, index) => (
@@ -155,14 +185,14 @@ export function PreviewForm({
                 maxLength={maxLength}
                 error={errors[`events.${index}.${errorKey}`]}
                 update={(value) =>
-                  setFields((current) => ({
-                    ...current,
-                    events: current.events.map((details, position) =>
+                  updateField(`events.${index}.${errorKey}`, {
+                    ...fields,
+                    events: fields.events.map((details, position) =>
                       position === index
                         ? { ...details, [key]: value }
                         : details,
                     ),
-                  }))
+                  })
                 }
               />
             ))}

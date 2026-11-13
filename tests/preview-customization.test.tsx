@@ -121,6 +121,82 @@ describe("personalized demo", () => {
     expect(watermark()).toHaveTextContent("Personalized preview");
   });
 
+  it("commits error descriptions before focusing the first invalid field on every submission", () => {
+    render(<HeirloomDemo />);
+    start();
+    const name = screen.getByLabelText("Partner 1 name");
+    const address = screen.getByLabelText("Venue address");
+    const submit = screen.getByRole("button", { name: "Apply to Preview" });
+    const focusEvents: {
+      field: HTMLElement;
+      invalid: string | null;
+      text: string | null;
+      visible: boolean;
+    }[] = [];
+    for (const field of [name, address]) {
+      field.addEventListener("focus", () => {
+        const descriptionId = field.getAttribute("aria-describedby");
+        const message = descriptionId
+          ? document.getElementById(descriptionId)
+          : null;
+        focusEvents.push({
+          field,
+          invalid: field.getAttribute("aria-invalid"),
+          text: message?.textContent ?? null,
+          visible:
+            !!message &&
+            !message.hidden &&
+            getComputedStyle(message).display !== "none",
+        });
+      });
+    }
+    edit("Partner 1 name", "");
+    edit("Venue address", "");
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      submit.focus();
+      apply();
+    }
+    expect(focusEvents).toEqual(
+      Array.from({ length: 2 }, () => ({
+        field: name,
+        invalid: "true",
+        text: "Partner name is required.",
+        visible: true,
+      })),
+    );
+
+    edit("Partner 1 name", " ");
+    expect(name).toHaveAttribute("aria-invalid", "true");
+    edit("Partner 1 name", "Devika");
+    expect(name).not.toHaveAttribute("aria-invalid");
+    expect(name).not.toHaveAttribute("aria-describedby");
+    expect(name).toHaveFocus();
+    expect(focusEvents).toHaveLength(2);
+
+    submit.focus();
+    apply();
+    expect(focusEvents.at(-1)).toEqual({
+      field: address,
+      invalid: "true",
+      text: "Venue address is required.",
+      visible: true,
+    });
+    expect(heading()).toHaveTextContent("Tara & Neel");
+
+    edit("Venue address", "12 River Road");
+    expect(address).not.toHaveAttribute("aria-invalid");
+    expect(address).not.toHaveAttribute("aria-describedby");
+    expect(address).toHaveFocus();
+    expect(focusEvents).toHaveLength(3);
+    submit.focus();
+    apply();
+    expect(submit).toHaveFocus();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(heading()).toHaveTextContent("Devika & Neel");
+    expect(watermark()).toHaveTextContent("Personalized preview");
+  });
+
   it("keeps draft and applied details out of storage and URLs and starts fresh after a remount", () => {
     const storage = vi.spyOn(Storage.prototype, "setItem");
     const location = window.location.href;
@@ -150,7 +226,7 @@ describe("personalized demo", () => {
     const sample = invitationSchema.parse({
       ...shellDemoInvitation,
       events: [
-        event,
+        { ...event, location: "Original entrance" },
         {
           ...event,
           id: "dinner",
@@ -195,6 +271,8 @@ describe("personalized demo", () => {
     const result = validatePreview(sample, fields).invitation!;
     expect(result.events[0].id).toBe(event.id);
     expect(result.events[0].venue.mapsUrl).toBeUndefined();
+    expect(result.events[0].location).toBeUndefined();
+    expect(screen.queryByText(/Original entrance/)).toBeNull();
     expect(result.events[1]).toEqual(sample.events[1]);
     expect(JSON.stringify(sample)).toBe(before);
   });
@@ -222,5 +300,56 @@ describe("preview time validation", () => {
     expect(result.events[0].startsAt).toBe("2028-11-05T05:30:00.000Z");
     expect(result.welcomeNote).toBeUndefined();
     expect(result.events[0].venue.mapsUrl).toBe(ny.events[0].venue.mapsUrl);
+  });
+
+  it("rejects a skipped wall time during Lord Howe's 30-minute spring transition", () => {
+    const sample = invitationSchema.parse({
+      ...shellDemoInvitation,
+      timeZone: "Australia/Lord_Howe",
+    });
+    const fields = previewFields(sample);
+    Object.assign(fields.events[0], { date: "2028-10-01", time: "02:15" });
+    expect(validatePreview(sample, fields).errors?.["events.0.time"]).toMatch(
+      /does not exist/,
+    );
+  });
+
+  it("uses the earlier occurrence of a repeated wall time during Lord Howe's 30-minute fall transition", () => {
+    const sample = invitationSchema.parse({
+      ...shellDemoInvitation,
+      timeZone: "Australia/Lord_Howe",
+    });
+    const fields = previewFields(sample);
+    Object.assign(fields.events[0], { date: "2028-04-02", time: "01:45" });
+    expect(validatePreview(sample, fields).invitation?.events[0].startsAt).toBe(
+      "2028-04-01T14:45:00.000Z",
+    );
+  });
+
+  it("preserves the exact later-fold timestamp with its offset and fractional seconds while editing another event", () => {
+    const laterStart = "2028-11-05T01:30:42.125-05:00";
+    const event = shellDemoInvitation.events[0];
+    const sample = invitationSchema.parse({
+      ...ny,
+      events: [
+        { ...event, startsAt: laterStart },
+        {
+          ...event,
+          id: "another-ceremony",
+          startsAt: "2028-11-06T15:45:12.123Z",
+        },
+      ],
+    });
+    const fields = previewFields(sample);
+    expect(fields.events[0]).toMatchObject({
+      date: "2028-11-05",
+      time: "01:30",
+    });
+    Object.assign(fields.events[1], { date: "2028-11-06", time: "11:00" });
+
+    const result = validatePreview(sample, fields).invitation!;
+    expect(result.events[0]).toEqual(sample.events[0]);
+    expect(result.events[0].startsAt).toBe(laterStart);
+    expect(result.events[1].startsAt).toBe("2028-11-06T16:00:00.000Z");
   });
 });
