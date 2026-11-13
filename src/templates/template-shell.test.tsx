@@ -1,5 +1,5 @@
 import { invitationSchema } from "@/lib/invitation-schema";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { Afterglow } from "./afterglow/Afterglow";
 import { createTemplateRegistry, templateRegistry } from "./registry";
@@ -45,25 +45,25 @@ describe("template registry and renderer", () => {
       ...shellDemoInvitation,
       couple: { partnerOne: "Alex", partnerTwo: "Sam" },
       welcomeNote: "Our own welcome",
-      timeZone: "UTC",
+      timeZone: "Asia/Kolkata",
       events: [
         {
-          id: "new",
-          title: "An evening together",
-          startsAt: "2027-12-12T12:00:00Z",
+          id: "second",
+          title: "Morning gathering",
+          startsAt: "2027-12-14T10:00:00Z",
           venue: {
-            name: "Orchid House",
-            address: "Fictional address",
+            name: "Garden Court",
+            address: "Another fictional address",
             mapsUrl: "https://maps.google.com/?q=Jaipur+Rajasthan",
           },
         },
         {
-          id: "second",
-          title: "Morning gathering",
-          startsAt: "2027-12-13T10:00:00Z",
+          id: "new",
+          title: "An evening together",
+          startsAt: "2027-12-12T22:00:00Z",
           venue: {
-            name: "Garden Court",
-            address: "Another fictional address",
+            name: "Orchid House",
+            address: "Fictional address",
             mapsUrl: "https://maps.google.com/?q=Jaipur+Rajasthan",
           },
         },
@@ -85,17 +85,27 @@ describe("template registry and renderer", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Orchid House")).toBeInTheDocument();
     expect(screen.getByText("Fictional address")).toBeInTheDocument();
-    const eventTime = document.querySelector(".afterglow-event time");
-    expect(eventTime).toHaveAttribute("datetime", "2027-12-12T12:00:00Z");
-    expect(eventTime).toHaveTextContent("12:00");
+    const timeline = screen.getByRole("region", { name: "Celebrate with us" });
+    const times = [...timeline.querySelectorAll("time")];
+    expect(times.map((time) => time.dateTime)).toEqual([
+      "2027-12-12T22:00:00Z",
+      "2027-12-14T10:00:00Z",
+    ]);
+    expect(times[0]).toHaveTextContent("Monday, 13 December 2027");
+    expect(times[0]).toHaveTextContent("3:30 am");
+    expect(
+      within(timeline).getByText("All times shown in Asia/Kolkata"),
+    ).toBeVisible();
   });
   it("renders an invitation with a long name and no welcome note or photos", () => {
     const longName = "A".repeat(80);
     const invitation = invitationSchema.parse({
       ...shellDemoInvitation,
       couple: { partnerOne: longName, partnerTwo: "Sam" },
-      welcomeNote: undefined,
       coverImage: undefined,
+      welcomeNote: undefined,
+      closingNote: undefined,
+      hosts: undefined,
     });
 
     const { container } = render(
@@ -104,8 +114,10 @@ describe("template registry and renderer", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       `${longName} & Sam`,
     );
-    expect(container.querySelector(".afterglow-welcome")).toBeNull();
-    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(container.querySelector(".invitation-story")).toBeNull();
+    expect(container.querySelector(".invitation-closing")).toBeNull();
+    expect(container.querySelector(".heirloom-cover")).toBeInTheDocument();
+    expect(container.querySelector("img")).toBeNull();
   });
   it("renders another registered component without renderer changes", () => {
     function Second({ invitation }: InvitationTemplateProps) {
@@ -136,8 +148,51 @@ describe("template registry and renderer", () => {
       "Tara & Neel",
     );
     expect(
-      screen.getByRole("link", { name: /Explore the celebration/ }),
+      screen.getByRole("link", { name: "Celebration schedule" }),
     ).toHaveAttribute("href", "#celebration");
+    expect(
+      screen.getByRole("link", { name: "Venue information" }),
+    ).toHaveAttribute("href", "#venues");
+    const venueSection = screen.getByRole("region", { name: "Wedding venues" });
+    expect(venueSection).toHaveAttribute("id", "venues");
+    const schedule = screen.getByRole("region", { name: "Celebrate with us" });
+    expect(schedule).toHaveAttribute("id", "celebration");
+    expect(
+      within(schedule).queryByRole("link", { name: /Get Directions/i }),
+    ).toBeNull();
+    const directions = within(venueSection).getByRole("link", {
+      name: /get directions to the marigold courtyard/i,
+    });
+    expect(directions).toHaveAttribute(
+      "href",
+      shellDemoInvitation.events[0].venue.mapsUrl,
+    );
+    expect(directions).toHaveAttribute("target", "_blank");
+    expect(directions).toHaveAttribute("rel", "noopener noreferrer");
+    const cover = screen.getByRole("heading", { level: 1 }).closest("header")!;
+    const story = screen.getByRole("region", { name: "A note from us" });
+    const closing = screen
+      .getByRole("heading", { name: "With love" })
+      .closest("footer")!;
+    const journey = [cover, story, schedule, venueSection, closing];
+    for (let index = 1; index < journey.length; index++) {
+      expect(
+        journey[index - 1].compareDocumentPosition(journey[index]) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+    expect(
+      within(cover).getByAltText(shellDemoInvitation.coverImage!.alt),
+    ).toBeInTheDocument();
+    expect(
+      within(story).getByText(shellDemoInvitation.welcomeNote!),
+    ).toBeVisible();
+    expect(screen.getAllByText(shellDemoInvitation.welcomeNote!)).toHaveLength(
+      1,
+    );
+    expect(
+      screen.getAllByRole("link", { name: /Get Directions/i }),
+    ).toHaveLength(1);
     expect(metadata.robots).toEqual({ index: false, follow: false });
   });
   it("does not couple demo branding to the core renderer", () => {

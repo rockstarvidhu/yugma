@@ -46,9 +46,9 @@ protocol and credentials, not remote availability, image content or server-side
 fetch safety. Map URLs follow the same URL policy. Usernames/passwords and
 javascript/data/file URLs are rejected.
 
-Blank/whitespace-only welcome notes, dress codes and captions normalize to
+Blank/whitespace-only welcome notes, closing notes, dress codes and captions normalize to
 `undefined`. Required strings remain non-empty. Optional objects/arrays should be
-omitted rather than sent as empty strings or null. Welcome text is limited to 500
+omitted rather than sent as empty strings or null. Welcome and closing notes are each limited to 500
 characters, dress codes to 100, and hosts to 10 names of up to 80 characters.
 
 ## Migration and fixtures
@@ -71,7 +71,7 @@ may pass canonical validation, but Heirloom treats them as unavailable and
 does not fetch them or forward them to the browser. Customer photos would
 need to be ingested into trusted storage and explicitly supported by this
 resolver before they can appear on the cover. A missing, unsupported, or
-failed photo leaves the cover's gradient, text, and details link in place.
+failed photo leaves the cover's gradient and text in place. Afterglow's quick links remain available.
 
 The schema has no primary event field and event titles are free text. Heirloom
 shows the first start by absolute time in the invitation's timezone. When

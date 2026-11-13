@@ -13,8 +13,8 @@ the renderer only selects a component and passes data. No animation dependency i
 needed. Afterglow has local CSS and uses existing Playfair Display and Inter fonts.
 
 `/demo/afterglow` renders a fictional invitation parsed by the canonical schema.
-The fixture exercises the photo-free path. Afterglow uses the invitation timezone
-for event dates and times and omits a missing welcome note.
+The fixture uses the bundled Heirloom cover photo. Afterglow uses the invitation
+timezone for event dates and times and omits a missing welcome note.
 
 The demo watermark includes an accessible banner in normal flow and a fixed
 decorative badge in the page gutter. Both leave pointer input available to guests.
@@ -22,3 +22,18 @@ Publishing access must be authorized on the server.
 
 Future envelope, scroll/floral and gallery effects belong in Afterglow, at its
 TODO markers, with reduced-motion and keyboard support. They are out of scope here.
+
+## Afterglow story and closing
+
+The sequence is Heirloom cover, quick links, personal note, celebration timeline,
+venues, and closing.
+The personal note renders the existing welcome message and optionally a photo
+from the gallery. Supply an absolute URL on the configured `SITE_URL` (or Vercel
+production origin) for a curated local raster asset at
+`/media/invitations/<name>.<ext>`. Deploy the file under `public/media/invitations/`.
+Supported extensions are AVIF, JPG, JPEG, PNG, and WebP. Other sources are omitted,
+and a failed load leaves the text-only layout. The cover image stays separate.
+
+The closing uses optional `closingNote` and `hosts`; it is omitted when both are
+absent. Afterglow renders the welcome message only in the personal note.
+Cover media handling is independent of the story gallery policy.

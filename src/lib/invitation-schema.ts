@@ -86,6 +86,7 @@ export const invitationSchema = z
     couple: coupleSchema,
     timeZone: timeZoneSchema,
     welcomeNote: optionalText("Welcome note", 500),
+    closingNote: optionalText("Closing note", 500),
     hosts: z.array(text("Host name", 80)).max(10).optional(),
     coverImage: invitationImageSchema.optional(),
     gallery: z.array(invitationImageSchema).max(MAX_GALLERY_IMAGES).optional(),

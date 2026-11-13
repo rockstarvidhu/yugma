@@ -4,10 +4,9 @@ import type { Invitation } from "@/types/invitation";
 
 type CoverProps = {
   invitation: Invitation;
-  detailsId?: string;
 };
 
-export function Cover({ invitation, detailsId = "celebration" }: CoverProps) {
+export function Cover({ invitation }: CoverProps) {
   // The schema has no primary event. Show when the celebrations begin.
   const firstStart = Math.min(
     ...invitation.events.map(({ startsAt }) => Date.parse(startsAt)),
@@ -30,9 +29,6 @@ export function Cover({ invitation, detailsId = "celebration" }: CoverProps) {
           <span className="heirloom-cover__ampersand">&amp;</span>{" "}
           <span>{invitation.couple.partnerTwo}</span>
         </h1>
-        <p className="heirloom-cover__welcome">
-          {invitation.welcomeNote ?? "Join us as we begin our life together."}
-        </p>
         <p className="heirloom-cover__date">
           {invitation.events.length > 1 && "Celebrations begin "}
           <time dateTime={new Date(firstStart).toISOString()}>
@@ -40,13 +36,6 @@ export function Cover({ invitation, detailsId = "celebration" }: CoverProps) {
           </time>
         </p>
       </div>
-
-      <a className="heirloom-cover__scroll" href={`#${detailsId}`}>
-        <span>Explore the celebration</span>
-        <span className="heirloom-cover__arrow" aria-hidden="true">
-          ↓
-        </span>
-      </a>
     </header>
   );
 }

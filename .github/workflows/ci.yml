@@ -35,6 +35,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Verify event timeline test discovery
+        run: npm exec -- vitest list --filesOnly | grep -Fx tests/event-timeline.test.tsx
+
       - name: Run unit tests
         run: npm run test
 

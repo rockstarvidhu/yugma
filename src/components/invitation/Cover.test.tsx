@@ -7,19 +7,13 @@ import { shellDemoInvitation } from "@/templates/internal/demo-invitation";
 afterEach(cleanup);
 
 describe("Cover", () => {
-  it("shows invitation names, welcome, local date, and an immediate details link", () => {
+  it("shows invitation names and the localized date", () => {
     render(<Cover invitation={shellDemoInvitation} />);
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
       "Tara & Neel",
     );
-    expect(
-      screen.getByText(/With full hearts and our favourite people/),
-    ).toBeVisible();
     expect(screen.getByText("Sunday, 12 December 2027")).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: /Explore the celebration/ }),
-    ).toHaveAttribute("href", "#celebration");
   });
 
   it("resolves the approved demo URL to a local photo and preserves its metadata", () => {
@@ -63,7 +57,7 @@ describe("Cover", () => {
 
     expect(photo).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1 })).toBeVisible();
-    expect(screen.getByRole("link")).toHaveAttribute("href", "#celebration");
+    expect(screen.getByText("Sunday, 12 December 2027")).toBeVisible();
   });
 
   it("shows the earliest celebration in the invitation timezone regardless of event order", () => {
