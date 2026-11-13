@@ -60,3 +60,20 @@ cannot satisfy the new descriptive-alt requirement and is intentionally rejected
 The fictional exported demo fixtures contain zero images and no broken remote
 placeholders. Applications can add their own licensed photographs using the
 optional image model; no image service is required to render the fixtures.
+
+## Heirloom cover
+
+Heirloom resolves cover photos before passing them to the Next.js image
+optimizer. The existing demo URL maps to a bundled copy of the licensed photo
+by Sabesh Photography LTD. The browser and optimizer only use the local copy.
+There is no configured customer image storage or upload pipeline. Other URLs
+may pass canonical validation, but Heirloom treats them as unavailable and
+does not fetch them or forward them to the browser. Customer photos would
+need to be ingested into trusted storage and explicitly supported by this
+resolver before they can appear on the cover. A missing, unsupported, or
+failed photo leaves the cover's gradient and text in place. Afterglow's quick links remain available.
+
+The schema has no primary event field and event titles are free text. Heirloom
+shows the first start by absolute time in the invitation's timezone. When
+there is more than one event, it labels that date as the beginning of the
+celebrations. Reordering events has no effect on this date.

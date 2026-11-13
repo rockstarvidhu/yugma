@@ -48,22 +48,22 @@ describe("template registry and renderer", () => {
       timeZone: "Asia/Kolkata",
       events: [
         {
-          id: "new",
-          title: "An evening together",
-          startsAt: "2027-12-12T22:00:00Z",
-          venue: {
-            name: "Orchid House",
-            address: "Fictional address",
-            mapsUrl: "https://maps.google.com/?q=Jaipur+Rajasthan",
-          },
-        },
-        {
           id: "second",
           title: "Morning gathering",
           startsAt: "2027-12-14T10:00:00Z",
           venue: {
             name: "Garden Court",
             address: "Another fictional address",
+            mapsUrl: "https://maps.google.com/?q=Jaipur+Rajasthan",
+          },
+        },
+        {
+          id: "new",
+          title: "An evening together",
+          startsAt: "2027-12-12T22:00:00Z",
+          venue: {
+            name: "Orchid House",
+            address: "Fictional address",
             mapsUrl: "https://maps.google.com/?q=Jaipur+Rajasthan",
           },
         },
@@ -85,16 +85,24 @@ describe("template registry and renderer", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Orchid House")).toBeInTheDocument();
     expect(screen.getByText("Fictional address")).toBeInTheDocument();
+    const timeline = screen.getByRole("region", { name: "Celebrate with us" });
+    const times = [...timeline.querySelectorAll("time")];
+    expect(times.map((time) => time.dateTime)).toEqual([
+      "2027-12-12T22:00:00Z",
+      "2027-12-14T10:00:00Z",
+    ]);
+    expect(times[0]).toHaveTextContent("Monday, 13 December 2027");
+    expect(times[0]).toHaveTextContent("3:30 am");
     expect(
-      screen.getByText("Monday, 13 December 2027").closest("time"),
-    ).toHaveAttribute("datetime", "2027-12-12T22:00:00Z");
-    expect(screen.getByText("3:30 am")).toBeVisible();
+      within(timeline).getByText("All times shown in Asia/Kolkata"),
+    ).toBeVisible();
   });
   it("renders an invitation with a long name and no welcome note or photos", () => {
     const longName = "A".repeat(80);
     const invitation = invitationSchema.parse({
       ...shellDemoInvitation,
       couple: { partnerOne: longName, partnerTwo: "Sam" },
+      coverImage: undefined,
       welcomeNote: undefined,
       closingNote: undefined,
       hosts: undefined,
@@ -108,7 +116,8 @@ describe("template registry and renderer", () => {
     );
     expect(container.querySelector(".invitation-story")).toBeNull();
     expect(container.querySelector(".invitation-closing")).toBeNull();
-    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(container.querySelector(".heirloom-cover")).toBeInTheDocument();
+    expect(container.querySelector("img")).toBeNull();
   });
   it("renders another registered component without renderer changes", () => {
     function Second({ invitation }: InvitationTemplateProps) {
@@ -160,6 +169,30 @@ describe("template registry and renderer", () => {
     );
     expect(directions).toHaveAttribute("target", "_blank");
     expect(directions).toHaveAttribute("rel", "noopener noreferrer");
+    const cover = screen.getByRole("heading", { level: 1 }).closest("header")!;
+    const story = screen.getByRole("region", { name: "A note from us" });
+    const closing = screen
+      .getByRole("heading", { name: "With love" })
+      .closest("footer")!;
+    const journey = [cover, story, schedule, venueSection, closing];
+    for (let index = 1; index < journey.length; index++) {
+      expect(
+        journey[index - 1].compareDocumentPosition(journey[index]) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+    expect(
+      within(cover).getByAltText(shellDemoInvitation.coverImage!.alt),
+    ).toBeInTheDocument();
+    expect(
+      within(story).getByText(shellDemoInvitation.welcomeNote!),
+    ).toBeVisible();
+    expect(screen.getAllByText(shellDemoInvitation.welcomeNote!)).toHaveLength(
+      1,
+    );
+    expect(
+      screen.getAllByRole("link", { name: /Get Directions/i }),
+    ).toHaveLength(1);
     expect(metadata.robots).toEqual({ index: false, follow: false });
   });
   it("does not couple demo branding to the core renderer", () => {

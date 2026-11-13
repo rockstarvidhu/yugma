@@ -1,3 +1,4 @@
+import { demoCoverPhotoUrl } from "@/lib/cover-photo";
 import { invitationSchema } from "@/lib/invitation-schema";
 import type { InvitationInput } from "@/types/invitation";
 
@@ -10,6 +11,13 @@ export const shellDemoInvitation = invitationSchema.parse({
     "We can't wait to share a meal, a dance and the start of this next chapter with you.",
   hosts: ["The families of Tara and Neel"],
   timeZone: "Asia/Kolkata",
+  // Photo by Sabesh Photography LTD, used under the Unsplash License:
+  // https://unsplash.com/photos/couple-in-traditional-indian-wedding-attire-in-a-garden-RIOegGLaUbE
+  coverImage: {
+    src: demoCoverPhotoUrl,
+    alt: "A couple in traditional Indian wedding attire in a garden",
+    focalPosition: { x: 0.5, y: 0.42 },
+  },
   events: [
     {
       id: "demo-celebration",

@@ -8,7 +8,7 @@
   padding: 0 1.5rem;
   overflow-wrap: anywhere;
 }
-.afterglow-cover,
+.afterglow-navigation,
 .afterglow-celebration,
 .afterglow-venues,
 .afterglow-invitation .invitation-story,
@@ -17,14 +17,8 @@
   margin: auto;
   text-align: center;
 }
-.afterglow-cover {
-  padding: 5rem 0 4rem;
-}
-.afterglow-eyebrow {
-  font-size: 0.7rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  line-height: 1.8;
+.afterglow-navigation {
+  padding: 1.5rem 0;
 }
 .afterglow-ornament {
   display: block;
@@ -32,22 +26,10 @@
   font-size: 2rem;
   margin: 2rem 0;
 }
-.afterglow-invitation h1,
 .afterglow-invitation h2,
 .afterglow-invitation h3 {
   font-family: var(--font-playfair), Georgia, serif;
   font-weight: 400;
-}
-.afterglow-invitation h1 {
-  font-size: clamp(2.6rem, 8vw, 5.5rem);
-  line-height: 1.15;
-  margin: 0;
-}
-.afterglow-ampersand {
-  display: block;
-  font-style: italic;
-  font-size: 0.65em;
-  margin: 0.25em 0;
 }
 .afterglow-celebration,
 .afterglow-venues {
@@ -120,9 +102,4 @@
   margin-top: 1.25rem;
   line-height: 1.7;
   font-weight: 600;
-}
-@media (min-width: 48rem) {
-  .afterglow-cover {
-    padding-top: 7rem;
-  }
 }

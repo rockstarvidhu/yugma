@@ -1,11 +1,13 @@
 import { ClosingNote } from "@/components/invitation/ClosingNote";
+import { Cover } from "@/components/invitation/Cover";
+import { EventTimeline } from "@/components/invitation/EventTimeline";
 import { StoryNote } from "@/components/invitation/StoryNote";
 import { QuickLinks } from "@/components/invitation/QuickLinks";
 import { VenueCard } from "@/components/invitation/VenueCard";
 import { venueIdentity } from "@/lib/venue-identity";
 import type { WeddingEvent } from "@/types/invitation";
-import { EventTimeline } from "@/components/invitation/EventTimeline";
 import type { InvitationTemplateProps } from "../types";
+import "../heirloom/heirloom.css";
 import "./afterglow.css";
 
 export function Afterglow({ invitation }: InvitationTemplateProps) {
@@ -20,20 +22,10 @@ export function Afterglow({ invitation }: InvitationTemplateProps) {
   return (
     <main className="afterglow-invitation">
       {/* TODO(afterglow): envelope opening and cinematic reveals belong inside this template. */}
-      <header className="afterglow-cover">
-        <p className="afterglow-eyebrow">
-          Afterglow · A celebration of togetherness
-        </p>
-        <span className="afterglow-ornament" aria-hidden="true">
-          ✧
-        </span>
-        <h1>
-          {invitation.couple.partnerOne}{" "}
-          <span className="afterglow-ampersand">&amp;</span>{" "}
-          {invitation.couple.partnerTwo}
-        </h1>
+      <Cover invitation={invitation} />
+      <div className="afterglow-navigation">
         <QuickLinks scheduleId="celebration" venueId="venues" />
-      </header>
+      </div>
       <StoryNote
         welcomeNote={invitation.welcomeNote}
         gallery={invitation.gallery}
