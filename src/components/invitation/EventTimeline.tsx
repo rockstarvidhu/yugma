@@ -8,6 +8,7 @@ type EventTimelineProps = {
   locale?: string;
   id?: string;
   className?: string;
+  showVenues?: boolean;
 };
 
 export function EventTimeline({
@@ -16,6 +17,7 @@ export function EventTimeline({
   locale = "en-IN",
   id,
   className,
+  showVenues = true,
 }: EventTimelineProps) {
   const headingId = useId();
   // Stable sorting preserves invitation order for events at the same instant.
@@ -73,7 +75,9 @@ export function EventTimeline({
                   <h3 className="break-words font-editorial text-2xl leading-snug text-heading sm:text-[1.75rem]">
                     {event.title}
                   </h3>
-                  <VenueCard venue={event.venue} location={event.location} />
+                  {showVenues && (
+                    <VenueCard venue={event.venue} location={event.location} />
+                  )}
                   {event.description && (
                     <p className="mt-3 text-sm leading-6 text-muted">
                       {event.description}

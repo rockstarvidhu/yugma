@@ -3,7 +3,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import { EventTimeline } from "@/components/invitation/EventTimeline";
 import { QuickLinks } from "@/components/invitation/QuickLinks";
 import { VenueCard } from "@/components/invitation/VenueCard";
-import { weddingEventSchema } from "@/lib/invitation-schema";
+import { Afterglow } from "@/templates/afterglow/Afterglow";
+import { shellDemoInvitation } from "@/templates/internal/demo-invitation";
+import { invitationSchema, weddingEventSchema } from "@/lib/invitation-schema";
 
 afterEach(cleanup);
 
@@ -120,4 +122,54 @@ describe("QuickLinks", () => {
     rerender(<QuickLinks />);
     expect(screen.queryByRole("navigation")).toBeNull();
   });
+});
+
+it("lists shared venue details and directions once and associates every event with its venue", () => {
+  const events = [
+    {
+      ...shellDemoInvitation.events[0],
+      id: "first",
+      title: "Ceremony",
+      venue,
+      location: "North entrance",
+    },
+    { ...shellDemoInvitation.events[0], id: "second", title: "Dinner", venue },
+    {
+      ...shellDemoInvitation.events[0],
+      id: "third",
+      title: "Reception",
+      venue: {
+        name: "Garden Court",
+        address: "Udaipur, Rajasthan",
+        mapsUrl: "https://maps.example.com/garden",
+      },
+    },
+  ];
+  render(
+    <Afterglow
+      invitation={invitationSchema.parse({ ...shellDemoInvitation, events })}
+    />,
+  );
+  const schedule = within(
+    screen.getByRole("region", { name: "Celebrate with us" }),
+  );
+  const venues = within(screen.getByRole("region", { name: "Wedding venues" }));
+  const sharedEvents = within(
+    venues.getAllByRole("list", { name: "Events at this venue" })[0],
+  );
+
+  expect(venues.getAllByRole("link", { name: /Get Directions/ })).toHaveLength(
+    2,
+  );
+  expect(screen.getAllByText(venue.address)).toHaveLength(1);
+  expect(sharedEvents.getByText("Ceremony")).toBeVisible();
+  expect(sharedEvents.getByText(/North entrance/)).toBeVisible();
+  expect(sharedEvents.getByText("Dinner")).toBeVisible();
+  expect(sharedEvents.queryByText("Reception")).toBeNull();
+  expect(
+    venues.getByRole("link", { name: /Get Directions to Garden Court/ }),
+  ).toHaveAttribute("href", "https://maps.example.com/garden");
+  expect(schedule.getByText("All times shown in Asia/Kolkata")).toBeVisible();
+  expect(schedule.queryByRole("link", { name: /Get Directions/ })).toBeNull();
+  expect(schedule.queryByText("North entrance")).toBeNull();
 });
