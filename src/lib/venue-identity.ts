@@ -21,6 +21,8 @@ function mapDestinationKey(mapsUrl?: string) {
       }
       destinationParams.append(name, value);
     }
+    // Sort by name, keeping repeated values in their original relative order.
+    destinationParams.sort();
     url.search = destinationParams.toString();
     return url.href;
   } catch {

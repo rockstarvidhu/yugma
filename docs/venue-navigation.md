@@ -9,8 +9,12 @@ ceremony descriptions, and attire. Afterglow moves venue details into its
 separate venue section. Other EventTimeline consumers retain inline VenueCards
 by default. Events with the same trimmed venue name and address and matching
 map destinations share one card. For comparison, the URL parser normalizes
-standard URL formatting and removes `utm_*`, `gclid`, and `fbclid` without
-changing the remaining parameters, their order, the path, or the fragment.
+standard URL formatting, removes `utm_*`, `gclid`, and `fbclid`, and sorts the
+remaining parameters by name. Repeated values for the same name retain their
+relative order. Paths and fragments stay part of the identity. Google Maps'
+documented directions URLs use query parameters for destinations, but fragments
+can carry provider-specific client-side state, so even fragment-only variations
+are kept separate.
 Missing and blank URLs use the same comparison value. The first event's
 original validated map URL supplies the directions link. Each card lists its
 associated events and any event-specific location detail.

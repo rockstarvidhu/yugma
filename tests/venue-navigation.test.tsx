@@ -181,6 +181,14 @@ describe("venue identity", () => {
 
   it.each([
     [baseMap, baseMap],
+    [
+      baseMap,
+      "https://www.google.com/maps/dir/?destination_place_id=cedar&destination=9.9%2C76.2&api=1",
+    ],
+    [
+      `${baseMap}&waypoints=first&waypoints=second`,
+      "https://www.google.com/maps/dir/?waypoints=first&destination_place_id=cedar&destination=9.9%2C76.2&waypoints=second&api=1",
+    ],
     [`${baseMap}&utm_source=email`, `${baseMap}&utm_source=chat`],
     [
       `${baseMap}&utm_campaign=wedding&utm_source=email&gclid=1`,
@@ -250,6 +258,15 @@ describe("venue identity", () => {
   ])("keeps different map destinations separate (%s)", (mapsUrl) => {
     expect(venueIdentity({ ...venue, mapsUrl })).not.toBe(
       venueIdentity({ ...venue, mapsUrl: baseMap }),
+    );
+  });
+
+  it("preserves the relative order of repeated parameter values", () => {
+    const first = `${baseMap}&waypoints=first&waypoints=second`;
+    const reversed = `${baseMap}&waypoints=second&waypoints=first`;
+
+    expect(venueIdentity({ ...venue, mapsUrl: first })).not.toBe(
+      venueIdentity({ ...venue, mapsUrl: reversed }),
     );
   });
 
