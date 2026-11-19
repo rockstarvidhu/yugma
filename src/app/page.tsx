@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
-import { BrandLogo } from "@/components/brand/BrandLogo";
-import { Container } from "@/components/ui/Container";
+import { Storefront } from "@/components/storefront/Storefront";
 
 // Corporate sharing metadata stays on the corporate route, not invitation routes.
 export const metadata: Metadata = {
+  title: { absolute: "YUGMA — Digital wedding invitations" },
+  description:
+    "Beautifully crafted digital invitations that bring your wedding story to life. Explore a YUGMA sample and try your details.",
   openGraph: {
     title: "YUGMA",
-    description: "Thoughtfully crafted digital invitations.",
+    description:
+      "Beautifully crafted digital invitations that bring your wedding story to life.",
     type: "website",
     images: [
       {
@@ -25,16 +28,5 @@ export const metadata: Metadata = {
 };
 
 export default function Home() {
-  return (
-    <main className="yugma-brand flex min-h-svh items-center">
-      <Container className="py-24 text-center">
-        <h1>
-          <BrandLogo priority />
-        </h1>
-        <p className="mt-8 text-sm leading-7 text-muted">
-          Thoughtfully crafted digital invitations.
-        </p>
-      </Container>
-    </main>
-  );
+  return <Storefront />;
 }

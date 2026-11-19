@@ -14,12 +14,14 @@ describe("YUGMA brand foundations", () => {
   it("identifies the homepage with the official wordmark and description", () => {
     render(<Home />);
     expect(
-      screen.getByRole("heading", { level: 1, name: "YUGMA" }),
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Some moments deserve more than an invitation.",
+      }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "YUGMA" })).toHaveAttribute(
-      "src",
-      "/brand/yugma-wordmark-forest.svg",
-    );
+    expect(
+      screen.getAllByRole("img", { name: "YUGMA home" })[0],
+    ).toHaveAttribute("src", "/brand/yugma-wordmark-forest.svg");
     expect(
       screen.getByText("Thoughtfully crafted digital invitations."),
     ).toBeInTheDocument();
