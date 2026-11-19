@@ -11,6 +11,7 @@ export function HomepageHeroSequence({ photo }: { photo?: string }) {
           {photo && (
             <Image
               className="home-moment-photo"
+              crossOrigin="anonymous"
               src={photo}
               alt=""
               fill
