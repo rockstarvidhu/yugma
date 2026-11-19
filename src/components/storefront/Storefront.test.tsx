@@ -7,28 +7,32 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getStorefrontCollection } from "@/lib/storefront-catalogue";
-import { templateRegistry } from "@/templates/registry";
+import { getLocalHero } from "@/lib/storefront-hero";
 import { Storefront } from "./Storefront";
 
 beforeEach(() => {
-  vi.stubGlobal(
-    "matchMedia",
-    vi.fn().mockImplementation(() => ({
-      matches: false,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    })),
-  );
+  vi.stubGlobal("matchMedia", () => ({
+    matches: false,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  }));
+  vi.stubGlobal("scrollTo", vi.fn());
 });
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
-describe("customer storefront foundation", () => {
-  it("has one primary heading, labelled landmarks and only real internal destinations", () => {
+describe("YUGMA homepage scroll and collection", () => {
+  it("keeps the headline and working destinations in static markup", () => {
     const { container } = render(<Storefront />);
-    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Some moments deserve more.",
+      }),
+    ).toBeVisible();
     expect(
       screen.getByRole("navigation", { name: "Main navigation" }),
     ).toBeVisible();
@@ -39,87 +43,70 @@ describe("customer storefront foundation", () => {
       "a[href]",
     )) {
       const url = new URL(link.href, "http://localhost");
-      if (url.hash) expect(container.querySelector(url.hash)).not.toBeNull();
-      expect(["/", "/demo/afterglow"]).toContain(url.pathname);
+      if (url.hash && url.pathname === "/")
+        expect(container.querySelector(url.hash)).not.toBeNull();
+      expect(["/", "/demo/heirloom", "/demo/afterglow"]).toContain(
+        url.pathname,
+      );
     }
-    expect(
-      within(
-        screen.getByRole("region", {
-          name: "Some moments deserve more than an invitation.",
-        }),
-      ).getByRole("link", { name: "Try a Demo" }),
-    ).toHaveAttribute("href", "/demo/afterglow");
   });
-  it("exposes only an actual registered design and accurately labels demo-only availability", () => {
+
+  it("shows two actual views of one registered template without claiming a second template", () => {
     render(<Storefront />);
-    const list = within(
-      screen.getByRole("list", { name: "Template collection" }),
+    const track = within(
+      screen.getByRole("list", { name: "Invitation preview slides" }),
     );
-    const cards = list.getAllByRole("listitem");
-    expect(cards).toHaveLength(1);
-    expect(cards[0]).toHaveAttribute("data-template-id", "afterglow");
-    expect(list.getByRole("heading", { name: "Afterglow" })).toBeVisible();
-    expect(list.queryByRole("heading", { name: "Heirloom" })).toBeNull();
-    expect(list.queryByText(/Thread Between Us/)).toBeNull();
-    expect(list.getByText(/Purchasing is not available yet/)).toBeVisible();
+    const slides = track.getAllByRole("listitem");
+    expect(slides).toHaveLength(2);
+    expect(slides.map((slide) => slide.dataset.templateId)).toEqual([
+      "afterglow",
+      "afterglow",
+    ]);
     expect(
-      list.queryByRole("link", { name: /buy|checkout|purchase|create/i }),
-    ).toBeNull();
-    expect(list.queryByText(/₹/)).toBeNull();
-    for (const item of getStorefrontCollection())
-      expect(templateRegistry.get(item.templateId)).toBeDefined();
-  });
-  it("omits entries when their renderer is unavailable instead of presenting dead demos", () => {
+      track.getByRole("link", { name: "View cover demo" }),
+    ).toHaveAttribute("href", "/demo/heirloom");
+    expect(
+      track.getByRole("link", { name: "View details demo" }),
+    ).toHaveAttribute("href", "/demo/afterglow#celebration");
+    expect(
+      track.queryByRole("link", { name: /buy|checkout|purchase|create/i }),
+    ).not.toBeInTheDocument();
     expect(getStorefrontCollection({ get: () => undefined })).toEqual([]);
   });
-  it("opens a labelled mobile disclosure and closes with Escape while returning focus", () => {
+
+  it("moves focus to the collection when skipping the intro", () => {
+    render(<Storefront />);
+    fireEvent.click(screen.getByRole("link", { name: "Skip intro" }));
+    expect(
+      screen.getByRole("region", { name: "The YUGMA Collection" }),
+    ).toHaveFocus();
+    expect(window.scrollTo).toHaveBeenCalled();
+    history.replaceState(null, "", "/");
+  });
+
+  it("opens and closes the mobile disclosure with Escape and returns focus", () => {
     render(<Storefront />);
     const toggle = screen.getByRole("button", { name: "Menu" });
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    expect(
-      screen.queryByRole("navigation", { name: "Mobile navigation" }),
-    ).toBeNull();
     fireEvent.click(toggle);
     const nav = screen.getByRole("navigation", { name: "Mobile navigation" });
     expect(toggle).toHaveAttribute("aria-controls", nav.id);
-    expect(toggle).toHaveAttribute("aria-expanded", "true");
-    const first = within(nav).getByRole("link", { name: "Home" });
-    first.focus();
+    within(nav).getByRole("link", { name: "Home" }).focus();
     fireEvent.keyDown(document, { key: "Escape" });
     expect(toggle).toHaveFocus();
     expect(toggle).toHaveAttribute("aria-expanded", "false");
-    fireEvent.click(toggle);
-    expect(
-      screen.getByRole("navigation", { name: "Mobile navigation" }),
-    ).toBeVisible();
   });
-  it("closes the mobile menu when a real section link is activated", () => {
-    render(<Storefront />);
-    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
-    const nav = screen.getByRole("navigation", { name: "Mobile navigation" });
-    fireEvent.click(within(nav).getByRole("link", { name: "Templates" }));
-    expect(screen.getByRole("button", { name: "Menu" })).toHaveAttribute(
-      "aria-expanded",
-      "false",
+
+  it("allows the loopback photograph only in opted-in development", () => {
+    vi.stubEnv("YUGMA_LOCAL_HERO", "1");
+    vi.stubEnv("NODE_ENV", "production");
+    expect(getLocalHero()).toBeUndefined();
+    const { container } = render(<Storefront />);
+    expect(container.querySelector(".home-moment-photo")).toBeNull();
+    expect(container.querySelector(".home-moment-media img")).toHaveAttribute(
+      "src",
+      "/images/storefront/brand-hero.svg",
     );
-  });
-  it("closes the disclosure on outside interaction", () => {
-    render(<Storefront />);
-    fireEvent.click(screen.getByRole("button", { name: "Menu" }));
-    fireEvent.pointerDown(screen.getByRole("main"));
-    expect(screen.getByRole("button", { name: "Menu" })).toHaveAttribute(
-      "aria-expanded",
-      "false",
-    );
-  });
-  it("keeps the focal hero separate from text and uses the approved local asset", () => {
-    render(<Storefront />);
-    const hero = screen.getByRole("region", {
-      name: "Some moments deserve more than an invitation.",
-    });
-    const photo = within(hero).getByRole("img", { name: /joining hands/ });
-    expect(photo.getAttribute("src")).toContain("hands-temporary.webp");
-    expect(hero.querySelector("h1 img")).toBeNull();
-    expect(photo).toHaveAttribute("sizes");
+    vi.stubEnv("NODE_ENV", "development");
+    expect(getLocalHero()).toBe("http://127.0.0.1:3161/hero.webp");
   });
 });

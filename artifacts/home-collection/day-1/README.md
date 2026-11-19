@@ -37,7 +37,7 @@ Full machine-readable evidence is in `browser-results.json`. These checks used d
 
 ## Screenshots
 
-Actual production-browser screenshots; no generated mockups:
+Actual production-browser screenshots. The first three captures include the earlier temporary hero. This redesign preserves them in an ignored local evidence folder and removes them from the current tracked tree. Historic commits still contain the earlier captures.
 
 - `01-home-desktop-1440.png` — full desktop page.
 - `02-home-mobile-390.png` — full mobile page.

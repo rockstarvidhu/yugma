@@ -10,7 +10,14 @@ export type StorefrontTemplate = {
   demoUrl: `/demo/${string}`;
   personalizeUrl: `/demo/${string}`;
   alternateDemoUrls: readonly `/demo/${string}`[];
-  preview: { src: string; alt: string; width: number; height: number };
+  views: readonly {
+    id: string;
+    label: string;
+    image: string;
+    alt: string;
+    href: `/demo/${string}`;
+    action: string;
+  }[];
   availability: "demo-available" | "in-development";
   purchaseAvailable: false;
   createUrl: null;
@@ -27,12 +34,24 @@ const afterglow: StorefrontTemplate = {
   demoUrl: "/demo/afterglow",
   personalizeUrl: "/demo/afterglow",
   alternateDemoUrls: ["/demo/heirloom"],
-  preview: {
-    src: "/invitations/heirloom-demo.jpg",
-    alt: "The Afterglow sample cover photograph: a couple in traditional Indian wedding attire in a garden",
-    width: 1920,
-    height: 1281,
-  },
+  views: [
+    {
+      id: "heirloom-cover",
+      label: "Heirloom cover",
+      image: "/images/storefront/heirloom-cover.webp",
+      alt: "Tara and Neel's Heirloom invitation cover with a photograph and their wedding date",
+      href: "/demo/heirloom",
+      action: "View cover demo",
+    },
+    {
+      id: "afterglow-celebration",
+      label: "Celebration details",
+      image: "/images/storefront/afterglow-celebration.webp",
+      alt: "Afterglow's ivory invitation page showing the celebration schedule",
+      href: "/demo/afterglow#celebration",
+      action: "View details demo",
+    },
+  ],
   availability: "demo-available",
   purchaseAvailable: false,
   createUrl: null,

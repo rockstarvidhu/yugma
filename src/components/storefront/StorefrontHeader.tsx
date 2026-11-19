@@ -3,11 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand/BrandLogo";
-import { Container } from "@/components/ui/Container";
-import { Button } from "@/components/ui/Button";
-
 import {
-  storefrontNavigation as navigation,
+  storefrontNavigation,
   storefrontRoutes,
 } from "@/lib/storefront-routes";
 
@@ -18,15 +15,15 @@ export function StorefrontHeader() {
 
   useEffect(() => {
     if (!open) return;
-    function escape(event: KeyboardEvent) {
+    const escape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setOpen(false);
         button.current?.focus();
       }
-    }
-    function outside(event: PointerEvent) {
+    };
+    const outside = (event: PointerEvent) => {
       if (!header.current?.contains(event.target as Node)) setOpen(false);
-    }
+    };
     const desktop = window.matchMedia("(min-width: 900px)");
     const resize = () => {
       if (desktop.matches) setOpen(false);
@@ -42,71 +39,45 @@ export function StorefrontHeader() {
   }, [open]);
 
   return (
-    <header className="store-header" ref={header}>
-      <Container className="store-header-row">
-        <BrandLogo
-          href="/"
-          label="YUGMA home"
-          priority
-          className="store-logo"
-        />
-        <nav className="store-desktop-nav" aria-label="Main navigation">
-          <ul>
-            {navigation.map(({ label, href }) => (
-              <li key={href}>
-                <Link href={href}>{label}</Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
-        <Link
-          className="store-link-button store-header-cta"
-          href={storefrontRoutes.collection}
-        >
-          Explore Templates
+    <header className="home-header" ref={header}>
+      <div className="home-header-row">
+        <Link href="/" className="home-header-logo" aria-label="YUGMA home">
+          <BrandLogo decorative tone="white" className="home-mark-light" />
+          <BrandLogo decorative tone="forest" className="home-mark-dark" />
         </Link>
-        <Button
+        <nav className="home-desktop-nav" aria-label="Main navigation">
+          {storefrontNavigation.slice(1, 3).map(({ label, href }) => (
+            <a href={href} key={href}>
+              {label}
+            </a>
+          ))}
+        </nav>
+        <a className="home-header-cta" href={storefrontRoutes.collection}>
+          Skip intro
+        </a>
+        <button
+          type="button"
+          className="home-menu-toggle"
           ref={button}
-          variant="ghost"
-          className="store-menu-toggle"
           aria-expanded={open}
-          aria-controls="store-mobile-navigation"
+          aria-controls="home-mobile-nav"
           onClick={() => setOpen(!open)}
         >
           {open ? "Close menu" : "Menu"}
-          <span
-            className={open ? "store-menu-icon is-open" : "store-menu-icon"}
-            aria-hidden="true"
-          >
-            <span />
-            <span />
-          </span>
-        </Button>
-      </Container>
+          <span aria-hidden="true">{open ? "×" : "☰"}</span>
+        </button>
+      </div>
       <nav
-        id="store-mobile-navigation"
-        className="store-mobile-nav"
-        hidden={!open}
+        className="home-mobile-nav"
+        id="home-mobile-nav"
         aria-label="Mobile navigation"
+        hidden={!open}
       >
-        <Container>
-          <ul>
-            {navigation.map(({ label, href }) => (
-              <li key={href}>
-                <Link href={href} onClick={() => setOpen(false)}>
-                  {label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-          <Link
-            className="store-link-button"
-            href={storefrontRoutes.collection}
-            onClick={() => setOpen(false)}
-          >
-            Explore Templates
-          </Link>
-        </Container>
+        {storefrontNavigation.slice(0, 3).map(({ label, href }) => (
+          <a href={href} key={href} onClick={() => setOpen(false)}>
+            {label}
+          </a>
+        ))}
       </nav>
     </header>
   );
