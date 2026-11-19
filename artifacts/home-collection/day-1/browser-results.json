@@ -1,0 +1,184 @@
+{
+  "environment": "Installed Google Chrome against production next start",
+  "base": "http://127.0.0.1:3151",
+  "viewports": [
+    {
+      "width": 320,
+      "height": 568,
+      "overflow": 0,
+      "menuTested": true,
+      "keyboardSkip": true,
+      "backNavigation": true,
+      "linksValid": true,
+      "allImagesLoaded": true,
+      "crop": {
+        "sourceUrl": "http://127.0.0.1:3151/_next/image?url=%2Fimages%2Fstorefront%2Fhands-temporary.webp&w=384&q=75",
+        "visible": true,
+        "ratio": 1,
+        "objectPosition": "50% 60%",
+        "handsFit": true
+      },
+      "fonts": {
+        "heading": "\"Playfair Display\", \"Playfair Display Fallback\", Georgia, serif",
+        "body": "Inter, \"Inter Fallback\", Arial, sans-serif"
+      },
+      "layoutShift": 0,
+      "consoleErrors": []
+    },
+    {
+      "width": 375,
+      "height": 667,
+      "overflow": 0,
+      "menuTested": true,
+      "keyboardSkip": true,
+      "backNavigation": true,
+      "linksValid": true,
+      "allImagesLoaded": true,
+      "crop": {
+        "sourceUrl": "http://127.0.0.1:3151/_next/image?url=%2Fimages%2Fstorefront%2Fhands-temporary.webp&w=384&q=75",
+        "visible": true,
+        "ratio": 1,
+        "objectPosition": "50% 60%",
+        "handsFit": true
+      },
+      "fonts": {
+        "heading": "\"Playfair Display\", \"Playfair Display Fallback\", Georgia, serif",
+        "body": "Inter, \"Inter Fallback\", Arial, sans-serif"
+      },
+      "layoutShift": 0,
+      "consoleErrors": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "overflow": 0,
+      "menuTested": true,
+      "keyboardSkip": true,
+      "backNavigation": true,
+      "linksValid": true,
+      "allImagesLoaded": true,
+      "crop": {
+        "sourceUrl": "http://127.0.0.1:3151/_next/image?url=%2Fimages%2Fstorefront%2Fhands-temporary.webp&w=384&q=75",
+        "visible": true,
+        "ratio": 1,
+        "objectPosition": "50% 60%",
+        "handsFit": true
+      },
+      "fonts": {
+        "heading": "\"Playfair Display\", \"Playfair Display Fallback\", Georgia, serif",
+        "body": "Inter, \"Inter Fallback\", Arial, sans-serif"
+      },
+      "layoutShift": 0,
+      "consoleErrors": []
+    },
+    {
+      "width": 430,
+      "height": 932,
+      "overflow": 0,
+      "menuTested": true,
+      "keyboardSkip": true,
+      "backNavigation": true,
+      "linksValid": true,
+      "allImagesLoaded": true,
+      "crop": {
+        "sourceUrl": "http://127.0.0.1:3151/_next/image?url=%2Fimages%2Fstorefront%2Fhands-temporary.webp&w=640&q=75",
+        "visible": true,
+        "ratio": 1,
+        "objectPosition": "50% 60%",
+        "handsFit": true
+      },
+      "fonts": {
+        "heading": "\"Playfair Display\", \"Playfair Display Fallback\", Georgia, serif",
+        "body": "Inter, \"Inter Fallback\", Arial, sans-serif"
+      },
+      "layoutShift": 0,
+      "consoleErrors": []
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "overflow": 0,
+      "menuTested": true,
+      "keyboardSkip": true,
+      "backNavigation": true,
+      "linksValid": true,
+      "allImagesLoaded": true,
+      "crop": {
+        "sourceUrl": "http://127.0.0.1:3151/_next/image?url=%2Fimages%2Fstorefront%2Fhands-temporary.webp&w=640&q=75",
+        "visible": true,
+        "ratio": 1,
+        "objectPosition": "50% 60%",
+        "handsFit": true
+      },
+      "fonts": {
+        "heading": "\"Playfair Display\", \"Playfair Display Fallback\", Georgia, serif",
+        "body": "Inter, \"Inter Fallback\", Arial, sans-serif"
+      },
+      "layoutShift": 0,
+      "consoleErrors": []
+    },
+    {
+      "width": 1440,
+      "height": 1000,
+      "overflow": 0,
+      "menuTested": false,
+      "keyboardSkip": true,
+      "backNavigation": true,
+      "linksValid": true,
+      "allImagesLoaded": true,
+      "crop": {
+        "sourceUrl": "http://127.0.0.1:3151/_next/image?url=%2Fimages%2Fstorefront%2Fhands-temporary.webp&w=640&q=75",
+        "visible": true,
+        "ratio": 0.8000168053104781,
+        "objectPosition": "50% 60%",
+        "handsFit": true
+      },
+      "fonts": {
+        "heading": "\"Playfair Display\", \"Playfair Display Fallback\", Georgia, serif",
+        "body": "Inter, \"Inter Fallback\", Arial, sans-serif"
+      },
+      "layoutShift": 0,
+      "consoleErrors": []
+    }
+  ],
+  "demos": [
+    {
+      "name": "heirloom",
+      "width": 320,
+      "sample": true,
+      "invalidAndValidPreview": true,
+      "resetAndReload": true,
+      "watermark": true,
+      "overflow": 0
+    },
+    {
+      "name": "afterglow",
+      "width": 320,
+      "sample": true,
+      "invalidAndValidPreview": true,
+      "resetAndReload": true,
+      "watermark": true,
+      "overflow": 0
+    },
+    {
+      "name": "heirloom",
+      "width": 1440,
+      "sample": true,
+      "invalidAndValidPreview": true,
+      "resetAndReload": true,
+      "watermark": true,
+      "overflow": 0
+    },
+    {
+      "name": "afterglow",
+      "width": 1440,
+      "sample": true,
+      "invalidAndValidPreview": true,
+      "resetAndReload": true,
+      "watermark": true,
+      "overflow": 0
+    }
+  ],
+  "reducedMotion": true,
+  "noJavaScript": true
+}
