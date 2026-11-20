@@ -211,7 +211,7 @@ export function TemplateCarousel({
             </div>
             <div className="home-slide-meta">
               <div>
-                <p>{slide.name}</p>
+                {collection.length > 1 && <p>{slide.name}</p>}
                 <h3>{slide.label}</h3>
               </div>
               <a href={slide.href}>{slide.action}</a>

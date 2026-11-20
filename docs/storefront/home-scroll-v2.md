@@ -1,5 +1,7 @@
 # Homepage scroll and collection redesign
 
+This report describes the previous internal-photo prototype. See [the responsive hero update](home-hero-v3.md) for the current assets and QA.
+
 ## Scope and branch
 
 Continued `feat/home-collection` in the existing Day 1 worktree. It started clean at `23bef9c2f638a46563f5a694c7cde1f7e88b7d1e`. The fetched `origin/main` was the Day 1 squash commit `1d6758e85d5b264d8f7d1554cde6a4d9dc7d9a2e`, with an identical starting file tree. Day 1 PR #12 is merged. The redesign stays on the existing branch. The cinematic and backend worktrees are outside its scope.

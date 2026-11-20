@@ -7,7 +7,6 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getStorefrontCollection } from "@/lib/storefront-catalogue";
-import { getLocalHero } from "@/lib/storefront-hero";
 import { Storefront } from "./Storefront";
 
 beforeEach(() => {
@@ -53,6 +52,7 @@ describe("YUGMA homepage scroll and collection", () => {
 
   it("shows two actual views of one registered template without claiming a second template", () => {
     render(<Storefront />);
+    expect(screen.getByText("Afterglow", { exact: true })).toBeVisible();
     const track = within(
       screen.getByRole("list", { name: "Invitation preview slides" }),
     );
@@ -96,17 +96,29 @@ describe("YUGMA homepage scroll and collection", () => {
     expect(toggle).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("allows the loopback photograph only in opted-in development", () => {
-    vi.stubEnv("YUGMA_LOCAL_HERO", "1");
-    vi.stubEnv("NODE_ENV", "production");
-    expect(getLocalHero()).toBeUndefined();
+  it("serves one eager hero image with distinct landscape and portrait sources", () => {
     const { container } = render(<Storefront />);
-    expect(container.querySelector(".home-moment-photo")).toBeNull();
-    expect(container.querySelector(".home-moment-media img")).toHaveAttribute(
-      "src",
-      "/images/storefront/brand-hero.svg",
+    const picture = container.querySelector(".home-moment-media picture");
+    const landscape = picture?.querySelector("source");
+    const portrait = picture?.querySelector("img");
+    expect(landscape).toHaveAttribute("media", "(min-width: 900px)");
+    expect(landscape).toHaveAttribute(
+      "sizes",
+      "(max-aspect-ratio: 16/9) 177.78vh, 100vw",
     );
-    vi.stubEnv("NODE_ENV", "development");
-    expect(getLocalHero()).toBe("http://127.0.0.1:3161/hero.webp");
+    expect(landscape?.getAttribute("srcset")).toMatch(
+      /hero-desktop-1280x720\.webp 1280w.*hero-desktop-1600x900\.webp 1600w.*hero-desktop-1920x1080\.webp 1920w/,
+    );
+    expect(portrait).toHaveAttribute(
+      "sizes",
+      "(max-aspect-ratio: 9/16) 56.25vh, 100vw",
+    );
+    expect(portrait?.getAttribute("srcset")).toMatch(
+      /hero-mobile-540x960\.webp 540w.*hero-mobile-810x1440\.webp 810w.*hero-mobile-1080x1920\.webp 1080w/,
+    );
+    expect(portrait).toHaveAttribute("fetchpriority", "high");
+    expect(portrait).toHaveAttribute("loading", "eager");
+    expect(portrait).toHaveAttribute("alt", "");
+    expect(picture?.querySelectorAll("img")).toHaveLength(1);
   });
 });

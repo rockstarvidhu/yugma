@@ -42,3 +42,6 @@ next-env.d.ts
 
 # Internal visual review contains the restricted hero photograph.
 /artifacts/home-collection/visual-v2/
+
+# Local Chrome recordings and screenshots.
+/artifacts/home-collection/hero-v3/

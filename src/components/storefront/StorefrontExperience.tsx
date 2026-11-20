@@ -8,13 +8,7 @@ function interval(progress: number, start: number, end: number) {
   return fraction * fraction * (3 - 2 * fraction);
 }
 
-export function StorefrontExperience({
-  photographic,
-  children,
-}: {
-  photographic: boolean;
-  children: ReactNode;
-}) {
+export function StorefrontExperience({ children }: { children: ReactNode }) {
   const root = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -24,7 +18,7 @@ export function StorefrontExperience({
     const header = element?.querySelector<HTMLElement>(".home-header");
     const photo =
       element?.querySelector<HTMLImageElement>(".home-moment-photo");
-    if (!element || !scene || !stage || !header) return;
+    if (!element || !scene || !stage || !header || !window.matchMedia) return;
 
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
     const desktop = window.matchMedia("(min-width: 900px)");
@@ -48,22 +42,22 @@ export function StorefrontExperience({
       element.style.setProperty(
         "--moment-zoom",
         String(
-          1 + (desktop.matches ? 0.16 : 0.12) * interval(progress, 0.12, 0.67),
+          1 + (desktop.matches ? 0.09 : 0.08) * interval(progress, 0.15, 0.55),
         ),
       );
       element.style.setProperty(
         "--moment-exit",
-        `${-16 * interval(progress, 0.64, 1)}%`,
+        `${-29 * interval(progress, 0.38, 0.86)}%`,
       );
       element.style.setProperty(
         "--moment-title",
         String(
-          interval(progress, 0.12, 0.34) * (1 - interval(progress, 0.48, 0.67)),
+          interval(progress, 0.15, 0.38) * (1 - interval(progress, 0.48, 0.66)),
         ),
       );
       element.style.setProperty(
         "--moment-copy-y",
-        `${(1 - interval(progress, 0.12, 0.34)) * 18}px`,
+        `${(1 - interval(progress, 0.15, 0.38)) * 18}px`,
       );
       element.style.setProperty(
         "--moment-cue",
@@ -75,19 +69,20 @@ export function StorefrontExperience({
       );
       element.style.setProperty(
         "--collection-delay",
-        `${39 * (1 - interval(progress, 0.23, 0.88))}svh`,
+        `${35 * (1 - interval(progress, 0.3, 0.88))}svh`,
       );
     };
     const schedule = () => {
       if (!frame) frame = requestAnimationFrame(update);
     };
     const measure = () => {
-      animate = photographic && !!photo?.naturalWidth && !reduced.matches;
+      if (photo && !photo.complete && !photo.naturalWidth && !reduced.matches)
+        return;
+      animate = Boolean(photo?.naturalWidth) && !reduced.matches;
       element.dataset.motion = animate ? "full" : "static";
       travel = Math.max(1, scene.offsetHeight - stage.offsetHeight);
       update();
     };
-    if (!window.matchMedia) return;
     const observer =
       typeof ResizeObserver !== "undefined"
         ? new ResizeObserver(measure)
@@ -110,7 +105,7 @@ export function StorefrontExperience({
       window.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", measure);
     };
-  }, [photographic]);
+  }, []);
 
   function navigate(event: MouseEvent<HTMLDivElement>) {
     if (
@@ -145,12 +140,7 @@ export function StorefrontExperience({
   }
 
   return (
-    <div
-      ref={root}
-      onClick={navigate}
-      className="yugma-brand home-v2"
-      data-photographic={photographic}
-    >
+    <div ref={root} onClick={navigate} className="yugma-brand home-v2">
       <a className="home-skip" href="#templates">
         Skip to collection
       </a>

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Instrument_Serif, Manrope } from "next/font/google";
 import { Storefront } from "@/components/storefront/Storefront";
-import { getLocalHero } from "@/lib/storefront-hero";
 
 const manrope = Manrope({
   subsets: ["latin"],
@@ -44,7 +43,7 @@ export const metadata: Metadata = {
 export default function Home() {
   return (
     <div className={`${manrope.variable} ${accent.variable}`}>
-      <Storefront photo={getLocalHero()} />
+      <Storefront />
     </div>
   );
 }
