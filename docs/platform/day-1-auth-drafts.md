@@ -47,7 +47,11 @@ erDiagram
 
 Local SQL ran twice on PostgreSQL WASM with Supabase roles and fixture implementations of `auth.uid()` and `auth.jwt()`. The assertions cover cross-account and anonymous draft isolation, purchase-state restrictions, optimistic version checks, owner-only asset metadata, event deduplication, public projection and refund withdrawal.
 
-The production build passed Chrome checks against a local Auth test double for missing configuration, unauthenticated redirects, invalid and valid credentials, session refresh, HTTP-only secure cookies and sign-out. The hosted Supabase sign-in and migration are pending.
+On November 20, the migration was applied through the Supabase SQL Editor on the empty staging database. The hosted database assertions passed and the transaction left zero test invitations and auth users. The Data API returned the Afterglow demo row and denied anonymous draft reads. The staging-backed app redirected signed-out visitors away from Studio.
+
+Before using `supabase db push` on this staging project, check the CLI migration history. If it omits `20261119000000`, mark the already-applied version with `supabase migration repair 20261119000000 --status applied --remote`. [Supabase migration history guide](https://supabase.com/docs/guides/deployment/database-migrations)
+
+The production build passed Chrome checks against a local Auth test double for missing configuration, unauthenticated redirects, invalid and valid credentials, session refresh, HTTP-only secure cookies and sign-out. Sign-in with hosted Supabase test accounts is pending.
 
 For a disposable database with no customer data, rollback consists of dropping `get_published_invitation(text)`, then `payment_events`, `orders`, `assets`, `invitations`, `templates` and the `yugma_private` schema in dependency order. Use a reviewed forward migration or a verified backup once data exists.
 
@@ -57,7 +61,7 @@ For a disposable database with no customer data, rollback consists of dropping `
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Runtime audit         | The pre-change lockfile reported one affected runtime package, Next.js 16.4.3. The 16.4.6 patch and the matching ESLint config are installed. `npm audit --omit=dev` now reports zero findings. |
 | Development audit     | Seven moderate findings remain in the TypeScript ESLint dependency chain through `minimatch`. Keep this tracked as development tooling maintenance.                                             |
-| Supabase test project | Hosted project, migration, provisioned accounts and actual sign-in still require confirmation.                                                                                                  |
+| Supabase test project | Staging migration and database isolation verified. Test account provisioning and hosted sign-in are pending.                                                                                    |
 | Email delivery        | Unverified. Day 1 uses pre-provisioned password accounts.                                                                                                                                       |
 | Hosting and domain    | GitHub returned no deployment records. Staging host and production domain require confirmation.                                                                                                 |
 | Razorpay              | Test account access and live merchant approval, credentials and settlement status require confirmation. No gateway configuration was used.                                                      |
