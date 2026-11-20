@@ -51,7 +51,7 @@ On November 20, the migration was applied through the Supabase SQL Editor on the
 
 Before using `supabase db push` on this staging project, check the CLI migration history. If it omits `20261119000000`, mark the already-applied version with `supabase migration repair 20261119000000 --status applied --remote`. [Supabase migration history guide](https://supabase.com/docs/guides/deployment/database-migrations)
 
-The production build passed Chrome checks against a local Auth test double for missing configuration, unauthenticated redirects, invalid and valid credentials, session refresh, HTTP-only secure cookies and sign-out. Sign-in with hosted Supabase test accounts is pending.
+The production build passed Chrome checks against a local Auth test double for missing configuration, unauthenticated redirects, invalid and valid credentials, session refresh, HTTP-only secure cookies and sign-out. The build also passed against hosted Supabase Auth with two disposable staging accounts in separate browser contexts. Both accounts signed in, retained access after reload with an HTTP-only secure cookie, and were redirected to sign-in after logout. Both test accounts remain in staging.
 
 For a disposable database with no customer data, rollback consists of dropping `get_published_invitation(text)`, then `payment_events`, `orders`, `assets`, `invitations`, `templates` and the `yugma_private` schema in dependency order. Use a reviewed forward migration or a verified backup once data exists.
 
@@ -61,7 +61,7 @@ For a disposable database with no customer data, rollback consists of dropping `
 | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Runtime audit         | The pre-change lockfile reported one affected runtime package, Next.js 16.4.3. The 16.4.6 patch and the matching ESLint config are installed. `npm audit --omit=dev` now reports zero findings. |
 | Development audit     | Seven moderate findings remain in the TypeScript ESLint dependency chain through `minimatch`. Keep this tracked as development tooling maintenance.                                             |
-| Supabase test project | Staging migration and database isolation verified. Test account provisioning and hosted sign-in are pending.                                                                                    |
+| Supabase test project | Staging migration, database isolation, and sign-in, reload and logout with two staging test accounts verified.                                                                                  |
 | Email delivery        | Unverified. Day 1 uses pre-provisioned password accounts.                                                                                                                                       |
 | Hosting and domain    | GitHub returned no deployment records. Staging host and production domain require confirmation.                                                                                                 |
 | Razorpay              | Test account access and live merchant approval, credentials and settlement status require confirmation. No gateway configuration was used.                                                      |
