@@ -1,7 +1,6 @@
 import "server-only";
-import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { getSupabaseConfig } from "@/lib/auth/client";
+import { createServiceClient } from "@/lib/auth/service";
 import type { getServerAuth } from "@/lib/auth/server";
 import {
   invitationDraftSchema,
@@ -87,27 +86,12 @@ export async function loadDraft({ client, ownerId }: DraftReader, id: string) {
   return toDraft(row, row.template.registry_key);
 }
 
-function writeClient() {
-  const config = getSupabaseConfig();
-  const secret = process.env.SUPABASE_SECRET_KEY;
-  if (!config || !secret?.startsWith("sb_secret_"))
-    throw new Error("Draft writes are not configured");
-
-  return createClient(config.url, secret, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-      detectSessionInUrl: false,
-    },
-  });
-}
-
 export async function createDraft(
   ownerId: string,
   templateKey: string,
   draft: InvitationDraft,
 ) {
-  const { data, error } = await writeClient()
+  const { data, error } = await createServiceClient()
     .rpc("create_private_draft", {
       p_owner_id: ownerId,
       p_registry_key: templateKey,
@@ -126,7 +110,7 @@ export async function saveDraft(
   expectedVersion: number,
   draft: InvitationDraft,
 ) {
-  const { data, error } = await writeClient()
+  const { data, error } = await createServiceClient()
     .rpc("save_private_draft", {
       p_owner_id: ownerId,
       p_draft_id: id,

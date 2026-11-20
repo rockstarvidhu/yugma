@@ -210,7 +210,35 @@ do $$
 declare
   draft_id uuid := current_setting('yugma.test_draft_id')::uuid;
   test_order_id uuid;
+  test_checkout_id uuid;
 begin
+  insert into public.orders (
+    invitation_id, owner_id, template_id, amount_paise, gateway_order_id, status
+  )
+    select i.id, i.owner_id, i.template_id, 89900, 'order_test_fixture', 'test_created'
+    from public.invitations as i where i.id = draft_id
+    returning id into strict test_checkout_id;
+
+  begin
+    insert into public.orders (
+      invitation_id, owner_id, template_id, amount_paise, gateway_order_id, status
+    )
+      select i.id, i.owner_id, i.template_id, 89900, 'order_test_duplicate', 'test_created'
+      from public.invitations as i where i.id = draft_id;
+    raise exception 'A second test checkout was accepted for the same draft';
+  exception when unique_violation then null;
+  end;
+
+  begin
+    update public.orders set status = 'test_verified' where id = test_checkout_id;
+    raise exception 'A test checkout was verified without a payment record';
+  exception when check_violation then null;
+  end;
+
+  update public.orders
+    set status = 'test_verified', gateway_payment_id = 'pay_test_fixture', verified_at = now()
+    where id = test_checkout_id;
+
   begin
     update public.invitations set status = 'paid' where id = draft_id;
     raise exception 'The database allowed a skipped status';
@@ -219,7 +247,7 @@ begin
   update public.invitations set status = 'payment_pending' where id = draft_id;
   begin
     update public.invitations set status = 'paid' where id = draft_id;
-    raise exception 'The database accepted paid status without a captured order';
+    raise exception 'The database accepted a verified test order as a real capture';
   exception when check_violation then null;
   end;
 

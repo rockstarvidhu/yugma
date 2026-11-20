@@ -38,6 +38,18 @@ export async function getStudioUser() {
   return { id: claims.sub };
 }
 
+export async function getVerifiedSession() {
+  const client = await getServerAuth({ writeCookies: true });
+  if (!client) return null;
+
+  const { data, error } = await client.auth.getUser();
+  const user = data?.user;
+  if (!error && user?.role === "authenticated" && !user.is_anonymous)
+    return { client, ownerId: user.id };
+  if (error?.status && error.status >= 500) throw error;
+  return null;
+}
+
 export async function requireStudioUser(returnTo: string) {
   const user = await getStudioUser();
   if (!user)

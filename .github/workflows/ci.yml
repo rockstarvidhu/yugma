@@ -59,7 +59,7 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v4
-      - name: Apply both migrations and verify draft authorization
+      - name: Apply migrations and verify draft and checkout authorization
         env:
           DB_CONTAINER: ${{ job.services.postgres.id }}
         run: |
