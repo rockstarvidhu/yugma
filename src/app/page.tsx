@@ -1,15 +1,28 @@
 import type { Metadata } from "next";
+import { Instrument_Serif, Manrope } from "next/font/google";
 import { Storefront } from "@/components/storefront/Storefront";
 
-// Corporate sharing metadata stays on the corporate route, not invitation routes.
+const manrope = Manrope({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-home-manrope",
+});
+const accent = Instrument_Serif({
+  subsets: ["latin"],
+  weight: "400",
+  style: "italic",
+  display: "swap",
+  variable: "--font-home-accent",
+});
+
 export const metadata: Metadata = {
   title: { absolute: "YUGMA — Digital wedding invitations" },
   description:
-    "Beautifully crafted digital invitations that bring your wedding story to life. Explore a YUGMA sample and try your details.",
+    "Beautifully crafted digital invitations, made to tell your story.",
   openGraph: {
     title: "YUGMA",
     description:
-      "Beautifully crafted digital invitations that bring your wedding story to life.",
+      "Beautifully crafted digital invitations, made to tell your story.",
     type: "website",
     images: [
       {
@@ -28,5 +41,9 @@ export const metadata: Metadata = {
 };
 
 export default function Home() {
-  return <Storefront />;
+  return (
+    <div className={`${manrope.variable} ${accent.variable}`}>
+      <Storefront />
+    </div>
+  );
 }

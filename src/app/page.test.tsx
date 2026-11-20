@@ -1,13 +1,27 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import Home, { metadata } from "./page";
 import BrandPreview from "./dev/brand/page";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { Button } from "@/components/ui/Button";
 
+vi.mock("next/font/google", () => ({
+  Manrope: () => ({ variable: "mock-manrope" }),
+  Instrument_Serif: () => ({ variable: "mock-instrument" }),
+}));
+
+beforeEach(() => {
+  vi.stubGlobal("matchMedia", () => ({
+    matches: false,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  }));
+});
+
 afterEach(() => {
   cleanup();
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
 });
 
 describe("YUGMA brand foundations", () => {
@@ -16,14 +30,16 @@ describe("YUGMA brand foundations", () => {
     expect(
       screen.getByRole("heading", {
         level: 1,
-        name: "Some moments deserve more than an invitation.",
+        name: "Some moments deserve more.",
       }),
     ).toBeInTheDocument();
     expect(
       screen.getAllByRole("img", { name: "YUGMA home" })[0],
     ).toHaveAttribute("src", "/brand/yugma-wordmark-forest.svg");
     expect(
-      screen.getByText("Thoughtfully crafted digital invitations."),
+      screen.getByText(
+        "Beautifully crafted digital invitations, made to tell your story.",
+      ),
     ).toBeInTheDocument();
     expect(metadata.openGraph).toMatchObject({
       images: [{ url: "/brand/yugma-og-brand.png", width: 1200, height: 630 }],
