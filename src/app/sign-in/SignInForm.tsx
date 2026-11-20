@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { signIn } from "./actions";
 
@@ -9,6 +9,7 @@ const inputClass =
 
 export function SignInForm({ returnTo }: { returnTo: string }) {
   const [error, action, pending] = useActionState(signIn, null);
+  const [email, setEmail] = useState("");
 
   return (
     <form action={action} className="grid gap-4">
@@ -20,6 +21,8 @@ export function SignInForm({ returnTo }: { returnTo: string }) {
           type="email"
           name="email"
           autoComplete="username"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
           required
         />
       </label>
