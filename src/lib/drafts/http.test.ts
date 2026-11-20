@@ -126,6 +126,50 @@ describe("private draft HTTP contract", () => {
     },
   );
 
+  it.each([
+    ["NUL", "Tara\u0000Neel"],
+    ["unpaired high surrogate", "Tara\uD800"],
+    ["unpaired low surrogate", "\uDC00Neel"],
+  ])("rejects %s before creating or saving a draft", async (_name, note) => {
+    const stored = { ...draft, data: { welcomeNote: "Original invitation" } };
+    mocks.loadDraft.mockResolvedValue(stored);
+    const data = { events: [{ id: "ceremony", description: note }] };
+    const post = await createDraft(json("POST", { ...createInput, data }));
+    const patch = await saveDraft(
+      json("PATCH", { ...updateInput, data }),
+      draft.id,
+    );
+
+    for (const response of [post, patch]) {
+      expect(response.status).toBe(422);
+      expect(await response.json()).toMatchObject({
+        error: {
+          code: "INVALID_DRAFT",
+          issues: [{ path: "data.events.0.description" }],
+        },
+      });
+    }
+    expect(mocks.createDraft).not.toHaveBeenCalled();
+    expect(mocks.saveDraft).not.toHaveBeenCalled();
+    expect(await (await loadDraft(draft.id)).json()).toEqual({ draft: stored });
+  });
+
+  it("passes valid Unicode and emoji to both write operations", async () => {
+    const data = { welcomeNote: "नमस्ते 🌸", couple: { partnerOne: "José" } };
+    mocks.createDraft.mockResolvedValue({ ...draft, data });
+    mocks.saveDraft.mockResolvedValue({ ...draft, data, version: 2 });
+
+    expect(
+      (await createDraft(json("POST", { ...createInput, data }))).status,
+    ).toBe(201);
+    expect(
+      (await saveDraft(json("PATCH", { ...updateInput, data }), draft.id))
+        .status,
+    ).toBe(200);
+    expect(mocks.createDraft).toHaveBeenCalledWith(ownerId, "afterglow", data);
+    expect(mocks.saveDraft).toHaveBeenCalledWith(ownerId, draft.id, 1, data);
+  });
+
   it("counts payload bytes and also rejects an oversized stream without Content-Length", async () => {
     const response = await createDraft(
       json("POST", {

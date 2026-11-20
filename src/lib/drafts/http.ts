@@ -35,6 +35,19 @@ function notFound() {
   return failure(404, { code: "DRAFT_NOT_FOUND", message: "Draft not found." });
 }
 
+function invalidTextPath(value: unknown, path: string): string | undefined {
+  if (typeof value === "string") {
+    // JSON decoding accepts escaped NUL and lone surrogates that JSONB rejects.
+    return value.includes("\0") || !value.isWellFormed() ? path : undefined;
+  }
+  if (value === null || typeof value !== "object") return;
+
+  for (const [key, child] of Object.entries(value)) {
+    const invalid = invalidTextPath(child, `${path}.${key}`);
+    if (invalid) return invalid;
+  }
+}
+
 async function requestBody<T extends { data: unknown }>(
   request: Request,
   schema: z.ZodType<T>,
@@ -93,6 +106,20 @@ async function requestBody<T extends { data: unknown }>(
       }),
     };
   }
+
+  const path = invalidTextPath(result.data.data, "data");
+  if (path) {
+    return {
+      response: failure(422, {
+        code: "INVALID_DRAFT",
+        message: "Correct the draft fields and try again.",
+        issues: [
+          { path, message: "Use valid Unicode text without NUL characters." },
+        ],
+      }),
+    };
+  }
+
   return { data: result.data };
 }
 

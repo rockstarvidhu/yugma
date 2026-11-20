@@ -52,7 +52,7 @@ The first save version is 1. Use the returned version for the next save. Schema 
 | 422    | `INVALID_DRAFT`     | Show the field issues when present.                         |
 | 500    | `INTERNAL_ERROR`    | Keep local edits and provide a retry.                       |
 
-Validation errors may contain `issues: [{ path, message }]`. A conflict is returned only after an owner-scoped read succeeds.
+Validation errors may contain `issues: [{ path, message }]`. Draft text containing a NUL character or an unpaired UTF-16 surrogate returns `422 INVALID_DRAFT` with the field path. Valid Unicode and emoji are accepted. A rejected write preserves the stored draft and its version. A conflict is returned only after an owner-scoped read succeeds.
 
 ```json
 {
@@ -71,3 +71,7 @@ Set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY` in an 
 Reads use the caller's client with owner filters and the existing RLS policies. The migration revokes direct authenticated write grants. Only the server-side service role can call the two invoker functions, which use a fixed search path. The server validates payloads and supplies the authenticated owner ID. The create function checks draft eligibility in the same statement. The save function matches owner, draft ID, draft state, schema version and save version in one atomic update. The existing trigger increments the version once. The server-only Supabase secret is privileged and belongs in the runtime secret store.
 
 `npm run test` runs the draft HTTP contract tests. The database CI job applies both migrations to disposable PostgreSQL with fixture Auth roles, then runs `supabase/tests/auth_drafts.sql`. For an existing disposable Supabase test database after migrations, run that same SQL file with `psql` and `ON_ERROR_STOP`. Its fictional fixtures roll back. Hosted Auth and Data API verification uses separate test accounts and requires approved staging credentials.
+
+On November 20, staging passed the database assertions and the built app passed hosted sign-in, create, list, load, save, logout, and cross-account isolation with two disposable users. Concurrent saves produced one successful write and one `409`. Escaped NUL and lone surrogates produced `422` without changing stored data or version. Valid Unicode and emoji persisted. The test users and their drafts were removed.
+
+The two migrations were applied to staging through the SQL Editor. Reconcile staging's CLI migration history against versions `20261119000000` and `20261120000000` before an automated migration push.
