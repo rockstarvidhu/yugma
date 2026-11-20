@@ -81,6 +81,23 @@ export const weddingEventSchema = z.object({
   description: optionalText("Ceremony description", 500),
   dressCode: optionalText("Dress code", 100),
 });
+
+function checkEventIds(
+  events: readonly { id: string }[],
+  ctx: z.RefinementCtx,
+) {
+  const ids = new Set<string>();
+  events.forEach((event, index) => {
+    if (ids.has(event.id))
+      ctx.addIssue({
+        code: "custom",
+        path: ["events", index, "id"],
+        message: "Event IDs must be unique within an invitation.",
+      });
+    ids.add(event.id);
+  });
+}
+
 export const invitationSchema = z
   .object({
     couple: coupleSchema,
@@ -98,20 +115,27 @@ export const invitationSchema = z
         `An invitation can include at most ${MAX_EVENTS} wedding functions.`,
       ),
   })
-  .superRefine((invitation, ctx) => {
-    const ids = new Set<string>();
-    invitation.events.forEach((event, index) => {
-      if (ids.has(event.id))
-        ctx.addIssue({
-          code: "custom",
-          path: ["events", index, "id"],
-          message: "Event IDs must be unique within an invitation.",
-        });
-      ids.add(event.id);
-    });
-  });
+  .superRefine((invitation, ctx) => checkEventIds(invitation.events, ctx));
+
+const draftEventSchema = weddingEventSchema
+  .extend({ venue: weddingVenueSchema.partial().strict() })
+  .partial()
+  .required({ id: true })
+  .strict();
+
+export const invitationDraftSchema = z
+  .strictObject({
+    ...invitationSchema.shape,
+    couple: coupleSchema.partial().strict(),
+    coverImage: invitationImageSchema.strict(),
+    gallery: z.array(invitationImageSchema.strict()).max(MAX_GALLERY_IMAGES),
+    events: z.array(draftEventSchema).max(MAX_EVENTS),
+  })
+  .partial()
+  .superRefine((draft, ctx) => checkEventIds(draft.events ?? [], ctx));
 
 export type Invitation = z.infer<typeof invitationSchema>;
+export type InvitationDraft = z.infer<typeof invitationDraftSchema>;
 export type WeddingEvent = z.infer<typeof weddingEventSchema>;
 export type WeddingVenue = z.infer<typeof weddingVenueSchema>;
 export type Partner = z.infer<typeof partnerSchema>;
