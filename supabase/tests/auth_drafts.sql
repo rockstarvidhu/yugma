@@ -21,47 +21,69 @@ begin
     insert into public.invitations (template_id, data)
       select id, current_setting('yugma.test_payload')::jsonb
       from public.templates where slug = 'afterglow';
-    raise exception 'Demo template allowed a draft';
+    raise exception 'Authenticated role could insert a draft directly';
   exception when insufficient_privilege then null;
   end;
+  if has_column_privilege('public.invitations', 'data', 'UPDATE')
+    or has_column_privilege('public.invitations', 'owner_id', 'INSERT')
+    or has_table_privilege('public.invitations', 'DELETE')
+    or has_function_privilege('public.create_private_draft(uuid,text,jsonb)', 'EXECUTE')
+    or has_function_privilege('public.save_private_draft(uuid,uuid,integer,jsonb)', 'EXECUTE')
+  then
+    raise exception 'Authenticated role has a direct draft mutation grant';
+  end if;
 end;
 $$;
 
 reset role;
 set local role service_role;
-update public.templates set status = 'active', price_in_paise = 150000 where slug = 'afterglow';
+do $$
+declare
+  draft_id uuid;
+  owner uuid := 'e1000000-0000-4000-8000-000000000001';
+  other_owner uuid := 'e1000000-0000-4000-8000-000000000002';
+  payload jsonb := current_setting('yugma.test_payload')::jsonb;
+begin
+  if not exists (select 1 from public.templates where slug = 'afterglow'
+    and status = 'demo' and price_in_paise is null and draft_eligible) then
+    raise exception 'Afterglow is not eligible for private drafts at its demo price';
+  end if;
+  insert into public.templates (slug, registry_key) values ('fixture-design', 'fixture-design');
+  if exists (select 1 from public.create_private_draft(owner, 'fixture-design', payload)) then
+    raise exception 'An ineligible template accepted a draft';
+  end if;
+  select id into strict draft_id from public.create_private_draft(owner, 'afterglow', payload);
+  perform set_config('yugma.test_draft_id', draft_id::text, true);
+
+  if exists (select 1 from public.save_private_draft(other_owner, draft_id, 1, payload)) then
+    raise exception 'Save accepted a different owner';
+  end if;
+  if not exists (
+    select 1 from public.save_private_draft(owner, draft_id, 1,
+      payload || '{"welcomeNote":"Welcome to the fictional celebration"}')
+    where version = 2 and data ? 'welcomeNote'
+  ) then
+    raise exception 'Current-version save failed to update the draft exactly once';
+  end if;
+  if exists (select 1 from public.save_private_draft(owner, draft_id, 1, payload)) then
+    raise exception 'A stale version updated the draft';
+  end if;
+end;
+$$;
 reset role;
 
 set local role authenticated;
 do $$
 declare
-  draft_id uuid;
+  draft_id uuid := current_setting('yugma.test_draft_id')::uuid;
 begin
-  insert into public.invitations (template_id, data)
-    select id, current_setting('yugma.test_payload')::jsonb
-    from public.templates where slug = 'afterglow'
-    returning id into strict draft_id;
-  perform set_config('yugma.test_draft_id', draft_id::text, true);
-
   if not exists (
     select 1 from public.invitations
     where id = draft_id and owner_id = auth.uid() and status = 'draft'
-      and schema_version = 1 and version = 1
+      and schema_version = 1 and version = 2 and data ? 'welcomeNote'
   ) then
-    raise exception 'Owner could not read their new versioned draft';
+    raise exception 'Owner could not read their saved draft';
   end if;
-
-  update public.invitations
-    set data = data || '{"welcomeNote":"Welcome to the fictional celebration"}'
-    where id = draft_id and version = 1;
-  if not found or not exists (
-    select 1 from public.invitations where id = draft_id and version = 2
-      and data ? 'welcomeNote'
-  ) then
-    raise exception 'Owner could not update their draft at the current version';
-  end if;
-  update public.invitations set data = data where id = draft_id and version = 1;
-  if found then raise exception 'A stale version updated the draft'; end if;
 
   begin
     update public.invitations set status = 'paid' where id = draft_id;
@@ -131,9 +153,12 @@ begin
   if exists (select 1 from public.invitations) or exists (select 1 from public.assets) then
     raise exception 'A second account could see the owner draft or assets';
   end if;
-  update public.invitations set data = '{}'::jsonb
-  where id = current_setting('yugma.test_draft_id')::uuid;
-  if found then raise exception 'A second account updated the owner draft'; end if;
+  begin
+    update public.invitations set data = '{}'::jsonb
+    where id = current_setting('yugma.test_draft_id')::uuid;
+    raise exception 'A second account was granted a direct table write';
+  exception when insufficient_privilege then null;
+  end;
   begin
     perform 1 from public.orders;
     raise exception 'An account got direct access to orders';
@@ -154,6 +179,11 @@ select set_config('request.jwt.claims', '{}', true);
 
 do $$
 begin
+  if has_function_privilege('public.create_private_draft(uuid,text,jsonb)', 'EXECUTE')
+    or has_function_privilege('public.save_private_draft(uuid,uuid,integer,jsonb)', 'EXECUTE')
+  then
+    raise exception 'Anonymous role can execute a draft mutation';
+  end if;
   begin
     perform 1 from public.invitations;
     raise exception 'An anonymous caller accessed the base invitation table';
@@ -172,6 +202,9 @@ $$;
 
 reset role;
 set local role service_role;
+
+-- Temporarily enable pricing for the pre-existing order and public projection tests.
+update public.templates set status = 'active', price_in_paise = 150000 where slug = 'afterglow';
 
 do $$
 declare

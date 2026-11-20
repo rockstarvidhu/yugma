@@ -43,3 +43,28 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  database:
+    name: Draft migration and RLS
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: disposable-ci-password
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply both migrations and verify draft authorization
+        env:
+          DB_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker exec -i "$DB_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 --single-transaction < supabase/fixtures/test-auth.sql
+          for migration in supabase/migrations/*.sql; do
+            docker exec -i "$DB_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 --single-transaction < "$migration"
+          done
+          docker exec -i "$DB_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/auth_drafts.sql

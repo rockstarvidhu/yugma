@@ -1,5 +1,7 @@
 # Developer B Day 1 auth and drafts
 
+This document records the original foundation. See [Private drafts for Studio](private-draft-api.md) for the current write boundary, eligibility and API contract.
+
 ## Route and catalogue agreement
 
 This platform contract uses the route shapes proposed in [storefront v0.1](../storefront/route-catalogue-contract-v0.1.md). Afterglow is the registered design. Heirloom is its cover and alternate demo URL. A separate product requires a registered design and an approved price.
