@@ -11,7 +11,7 @@ const { chromium } = await import(
 );
 const root = process.env.PREVIEW_URL || "http://127.0.0.1:3160";
 const production = process.argv.includes("--production");
-const output = path.resolve("artifacts/home-collection/hero-v3");
+const output = path.resolve("artifacts/home-collection/final-review");
 const browser = await chromium.launch({
   executablePath:
     process.env.CHROME_PATH ||
@@ -58,7 +58,7 @@ async function measure(page) {
     const element = (selector) => document.querySelector(selector);
     const stage = element(".home-stage");
     const heading = element("#collection-heading").getBoundingClientRect();
-    const artwork = element(".home-slide-art").getBoundingClientRect();
+    const artwork = element(".home-featured-art").getBoundingClientRect();
     const copy = element(".home-moment-copy").getBoundingClientRect();
     const photo = element(".home-moment-photo");
     const picture = photo.getBoundingClientRect();
@@ -127,41 +127,6 @@ async function measure(page) {
     };
   });
 }
-async function expectSlide(page, slide) {
-  await page.waitForFunction(
-    (n) =>
-      document
-        .querySelector(".home-carousel-count")
-        .textContent.trim()
-        .startsWith(String(n)),
-    slide,
-  );
-}
-async function swipe(page) {
-  const art = page.locator(".home-slide-art").first();
-  await art.scrollIntoViewIfNeeded();
-  const bounds = await art.boundingBox();
-  const cdp = await page.context().newCDPSession(page);
-  const x = Math.round(bounds.x + bounds.width * 0.86);
-  const end = Math.round(bounds.x + bounds.width * 0.13);
-  const y = Math.round(bounds.y + bounds.height * 0.55);
-  await cdp.send("Input.dispatchTouchEvent", {
-    type: "touchStart",
-    touchPoints: [{ x, y, id: 1 }],
-  });
-  for (let i = 1; i <= 12; i++) {
-    await cdp.send("Input.dispatchTouchEvent", {
-      type: "touchMove",
-      touchPoints: [{ x: Math.round(x + ((end - x) * i) / 12), y, id: 1 }],
-    });
-    await page.waitForTimeout(16);
-  }
-  await cdp.send("Input.dispatchTouchEvent", {
-    type: "touchEnd",
-    touchPoints: [],
-  });
-  await cdp.detach();
-}
 async function scrollFilm(page, end, duration) {
   await page.evaluate(
     ({ end, duration }) =>
@@ -198,11 +163,11 @@ async function record(width, height, filename, mobile) {
     );
     await page.waitForTimeout(700);
     await scrollFilm(page, finish, 4400);
-    await page.waitForTimeout(450);
-    if (mobile) await swipe(page);
-    else await page.getByRole("button", { name: "Next preview" }).click();
-    await expectSlide(page, 2);
     await page.waitForTimeout(550);
+    if (mobile) {
+      await scrollFilm(page, finish + height * 0.36, 950);
+      await page.waitForTimeout(600);
+    }
     await scrollFilm(page, 0, 4200);
     await page.waitForTimeout(650);
   } finally {
@@ -276,10 +241,24 @@ async function checkHomepage() {
     });
     const page = await context.newPage(),
       errors = [];
+    await page.addInitScript(() => {
+      window.homePaint = { layoutShift: 0, lcpMs: null, lcpImage: null };
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries())
+          if (!entry.hadRecentInput)
+            window.homePaint.layoutShift += entry.value;
+      }).observe({ type: "layout-shift", buffered: true });
+      new PerformanceObserver((list) => {
+        const candidate = list.getEntries().at(-1);
+        window.homePaint.lcpMs = Math.round(candidate.startTime);
+        window.homePaint.lcpImage =
+          candidate.element?.classList.contains("home-moment-photo");
+      }).observe({ type: "largest-contentful-paint", buffered: true });
+    });
     const heroRequests = [];
     page.on("request", (request) => {
       const url = new URL(request.url());
-      if (url.pathname.startsWith("/images/home/hero/"))
+      if (url.pathname.startsWith("/dev/home-hero/"))
         heroRequests.push(url.pathname);
     });
     page.on("pageerror", (error) => errors.push(error.message));
@@ -306,7 +285,11 @@ async function checkHomepage() {
       "Only the selected photograph downloads",
     );
     assert(image.bytes > 0);
-    assert(!(await page.content()).includes("127.0.0.1:3161"));
+    const initialPaint = await page.evaluate(() => window.homePaint);
+    assert(
+      initialPaint.layoutShift < 0.03,
+      "Initial content stays stable as the image loads",
+    );
     const frames = [];
     for (const progress of [
       0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.65, 0.7, 0.8, 0.9, 1,
@@ -341,25 +324,14 @@ async function checkHomepage() {
           "First artwork enters while the photo is present",
         );
       frames.push(frame);
-      const capture =
-        width === 390
-          ? {
-              0: "01-hero-arrival-mobile.png",
-              0.4: "02-hero-zoom-headline-mobile.png",
-              0.7: "03-hero-handoff-mobile.png",
-              1: "04-first-collection-card-mobile.png",
-            }
-          : width === 320
-            ? { 0.4: "05-mobile-short-320x568.png" }
-            : width === 1440
-              ? {
-                  0: "06-hero-arrival-desktop.png",
-                  0.4: "07-hero-headline-desktop.png",
-                  0.7: "08-hero-handoff-desktop.png",
-                  1: "09-collection-desktop.png",
-                }
-              : {};
-      if (capture[progress]) await shot(page, capture[progress]);
+      if (width === 1440 && progress === 0)
+        await shot(page, "01-desktop-hero-1440.png");
+      if (width === 390 && progress === 0)
+        await shot(page, "02-mobile-hero-390.png");
+      if (width === 390 && progress === 0.4)
+        await shot(page, "03-mobile-headline-reveal.png");
+      if (width === 390 && progress === 0.7)
+        await shot(page, "04-mobile-transition-midpoint.png");
     }
     await seek(page, 0.4);
     assert((await measure(page)).title > 0.95);
@@ -380,75 +352,55 @@ async function checkHomepage() {
         section.y - (await page.locator(".home-header").boundingBox()).height,
       ) < 3,
     );
-    const track = page.getByRole("list", {
-      name: "Invitation preview slides",
+    assert.equal(
+      await skip.count(),
+      0,
+      "Skip intro is no longer exposed at the collection",
+    );
+    const gallery = page.getByRole("region", { name: "The YUGMA Collection" });
+    const action = gallery.getByRole("link", {
+      name: "Preview Experience: Afterglow",
     });
-    const next = page.getByRole("button", { name: "Next preview" });
-    await next.click();
-    await expectSlide(page, 2);
-    assert(await next.evaluate((button) => button === document.activeElement));
-    assert.equal(await next.getAttribute("aria-disabled"), "true");
-    await track.focus();
-    await page.keyboard.press("Home");
-    await expectSlide(page, 1);
-    await page.keyboard.press("ArrowRight");
-    await expectSlide(page, 2);
-    await page.keyboard.press("ArrowLeft");
-    await expectSlide(page, 1);
-    if (mobile) {
-      await swipe(page);
-      await expectSlide(page, 2);
-      if (width === 390) await shot(page, "11-carousel-swipe-mobile.png");
-      await track.focus();
-      await page.keyboard.press("Home");
-      await expectSlide(page, 1);
-    }
-    if (width === 1440) {
-      const art = await page.locator(".home-slide-art").first().boundingBox();
-      const y = Math.round(art.y + art.height * 0.45);
-      await page.mouse.move(art.x + art.width * 0.7, y);
-      await page.mouse.down();
-      await page.mouse.move(art.x + art.width * 0.35, y, { steps: 12 });
-      await page.mouse.up();
-      await expectSlide(page, 2);
-      await track.focus();
-      await page.keyboard.press("Home");
-      await expectSlide(page, 1);
+    assert.equal(await gallery.getByRole("link").count(), 1);
+    assert.equal(await gallery.getByRole("button").count(), 0);
+    assert.equal(await gallery.getByRole("list").count(), 0);
+    assert.equal(
+      await gallery.getByRole("heading", { name: "Afterglow" }).count(),
+      1,
+    );
+    assert.equal(await action.getAttribute("href"), "/demo/afterglow");
+    const art = gallery.locator(".home-featured-art");
+    await art.locator("img").evaluate((img) => img.decode());
+    const portrait = await art.boundingBox();
+    assert(portrait.height / portrait.width > 1.35);
+    if (mobile) assert(portrait.width >= width * 0.85);
+    if (width === 390 || width === 1440) {
+      await shot(
+        page,
+        width === 390
+          ? "05-mobile-featured-template.png"
+          : "06-desktop-featured-template.png",
+      );
+      await action.focus();
+      await page.keyboard.press("Enter");
+      await page.waitForURL("**/demo/afterglow");
+      assert(
+        await page
+          .getByRole("complementary", { name: "Demo preview" })
+          .isVisible(),
+      );
+      await home(page);
     }
     if (width < 900) {
       await seek(page, 0);
       const menu = page.getByRole("button", { name: "Menu", exact: false });
       await menu.click();
       assert.equal(await menu.getAttribute("aria-expanded"), "true");
-      if (width === 390) await shot(page, "12-header-mobile-menu.png");
       await page.keyboard.press("Escape");
       assert.equal(await menu.getAttribute("aria-expanded"), "false");
       assert(
         await menu.evaluate((button) => button === document.activeElement),
       );
-    }
-    assert.deepEqual(
-      await track
-        .locator("li")
-        .evaluateAll((els) => els.map((e) => e.dataset.templateId)),
-      ["afterglow", "afterglow"],
-    );
-    const demoLinks = await track
-      .getByRole("link")
-      .evaluateAll((links) => links.map((l) => l.getAttribute("href")));
-    assert.deepEqual(demoLinks, [
-      "/demo/heirloom",
-      "/demo/afterglow#celebration",
-    ]);
-    await track
-      .locator("img")
-      .evaluateAll((images) => Promise.all(images.map((img) => img.decode())));
-    if (width === 1440) {
-      await seek(page, 0);
-      await page.evaluate(
-        () => (document.querySelector(".home-v2").dataset.motion = "static"),
-      );
-      await shot(page, "13-full-page-desktop.png", true);
     }
     assert.deepEqual(errors, []);
     report.viewports.push({
@@ -456,6 +408,7 @@ async function checkHomepage() {
       height,
       dpr,
       image,
+      initialPaint,
       frames,
       passed: true,
     });
@@ -480,10 +433,17 @@ async function checkHomepage() {
       .evaluate((e) => getComputedStyle(e).opacity),
     "1",
   );
-  await shot(reduced, "10-reduced-motion-mobile.png");
   await reduced.getByRole("link", { name: "Skip intro" }).click();
-  await reduced.getByRole("button", { name: "Next preview" }).click();
-  await expectSlide(reduced, 2);
+  await settle(reduced);
+  assert.equal(
+    await reduced.getByRole("link", { name: "Skip intro" }).count(),
+    0,
+  );
+  assert(
+    await reduced
+      .getByRole("link", { name: "Preview Experience: Afterglow" })
+      .isVisible(),
+  );
   await reduced.close();
   const noJs = await browser.newContext({
     javaScriptEnabled: false,
@@ -538,13 +498,126 @@ async function checkHomepage() {
   await resizing.close();
   report.responsiveResize = true;
 
-  await record(390, 844, "hero-to-carousel-mobile.webm", true);
-  await record(1440, 900, "hero-to-carousel-desktop.webm", false);
+  const delayed = await browser.newPage({
+    viewport: { width: 390, height: 844 },
+  });
+  let releasePhoto;
+  const imageGate = new Promise((resolve) => {
+    releasePhoto = resolve;
+  });
+  let requestedPhoto;
+  const requestSeen = new Promise((resolve) => {
+    requestedPhoto = resolve;
+  });
+  await delayed.route("**/dev/home-hero/*.webp", async (route) => {
+    requestedPhoto();
+    await imageGate;
+    await route.continue();
+  });
+  await delayed.goto(root, { waitUntil: "domcontentloaded" });
+  await requestSeen;
+  const earlyCopy = delayed.locator(".home-moment-copy");
+  assert.equal(
+    await earlyCopy.evaluate((copy) => getComputedStyle(copy).visibility),
+    "hidden",
+  );
+  releasePhoto();
+  await delayed.locator('[data-motion="full"]').waitFor();
+  assert.equal((await measure(delayed)).title, 0);
+  await seek(delayed, 0.4);
+  assert((await measure(delayed)).title > 0.95);
+  await delayed.close();
+  report.noDelayedImageFlash = true;
+
+  for (const [width, height, screenshot] of [
+    [1440, 900, "07-full-homepage-desktop.png"],
+    [390, 844, "08-full-homepage-mobile.png"],
+  ]) {
+    const page = await browser.newPage({
+      viewport: { width, height },
+      reducedMotion: "reduce",
+    });
+    await home(page, false);
+    await page
+      .locator(".home-moment-photo")
+      .evaluate((image) => image.decode());
+    const art = page.locator(".home-featured-art img");
+    await art.scrollIntoViewIfNeeded();
+    await art.evaluate((image) => image.decode());
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+    await settle(page);
+    await shot(page, screenshot, true);
+    await page.close();
+  }
+  await record(390, 844, "hero-to-collection-mobile.webm", true);
+  await record(1440, 900, "hero-to-collection-desktop.webm", false);
+  for (const [width, height] of [
+    [320, 568],
+    [375, 667],
+    [430, 932],
+  ])
+    await record(
+      width,
+      height,
+      `hero-to-collection-mobile-${width}.webm`,
+      true,
+    );
+}
+
+async function checkProductionHomepage() {
+  for (const [width, height] of [
+    [320, 568],
+    [1440, 900],
+  ]) {
+    const page = await browser.newPage({ viewport: { width, height } });
+    const photoRequests = [];
+    page.on("request", (request) => {
+      if (/hero-(mobile|desktop)-/.test(request.url()))
+        photoRequests.push(request.url());
+    });
+    await home(page, false);
+    assert.equal(await page.locator(".home-moment-photo").count(), 0);
+    assert(await page.getByRole("heading", { level: 1 }).isVisible());
+    assert(
+      (
+        await page
+          .locator(".home-stage")
+          .evaluate((stage) => getComputedStyle(stage).backgroundImage)
+      ).includes("brand-hero.svg"),
+    );
+    assert.deepEqual(photoRequests, []);
+    await page.getByRole("link", { name: "Skip intro" }).click();
+    await settle(page);
+    assert.equal(
+      await page.getByRole("link", { name: "Skip intro" }).count(),
+      0,
+    );
+    assert(
+      await page
+        .getByRole("link", { name: "Preview Experience: Afterglow" })
+        .isVisible(),
+    );
+    report.viewports.push({ width, height, brandFallback: true });
+    if (width === 1440) {
+      const assets = await fs.readdir("assets/home-hero");
+      for (const filename of assets)
+        for (const prefix of ["/images/home/hero/", "/dev/home-hero/"])
+          assert.equal(
+            (await page.request.get(root + prefix + filename)).status(),
+            404,
+          );
+    }
+    await page.close();
+  }
 }
 
 try {
-  await checkHomepage();
-  if (production) await checkDemos();
+  if (production) {
+    await checkProductionHomepage();
+    await checkDemos();
+  } else {
+    await checkHomepage();
+  }
   await fs.writeFile(
     path.join(
       output,

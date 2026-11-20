@@ -10,18 +10,45 @@ import {
 } from "react";
 import type { StorefrontTemplate } from "@/lib/storefront-catalogue";
 
-type Slide = StorefrontTemplate["views"][number] & {
-  templateId: string;
-  name: string;
-};
+function TemplateFeature({ template }: { template: StorefrontTemplate }) {
+  return (
+    <article className="home-featured" data-template-id={template.templateId}>
+      <div className="home-featured-art">
+        <Image
+          src={template.preview.src}
+          alt={template.preview.alt}
+          width={template.preview.width}
+          height={template.preview.height}
+          sizes="(min-width: 1080px) 490px, (min-width: 760px) 45vw, 90vw"
+          draggable={false}
+        />
+      </div>
+      <div className="home-featured-copy">
+        <h3>{template.name}</h3>
+        <p>{template.description}</p>
+        {template.availability === "demo-available" ? (
+          <a
+            href={template.demoUrl}
+            aria-label={`Preview Experience: ${template.name}`}
+            className="home-button home-featured-action"
+          >
+            Preview Experience
+          </a>
+        ) : (
+          <p className="home-featured-status">In development</p>
+        )}
+      </div>
+    </article>
+  );
+}
 
-function positions(element: HTMLOListElement) {
+function positions(element: HTMLUListElement) {
   const max = element.scrollWidth - element.clientWidth;
   return Array.from(element.children, (child) =>
     Math.min(max, (child as HTMLElement).offsetLeft),
   );
 }
-function nearest(element: HTMLOListElement) {
+function nearest(element: HTMLUListElement) {
   const points = positions(element);
   return points.reduce(
     (best, point, index) =>
@@ -37,14 +64,22 @@ export function TemplateCarousel({
 }: {
   collection: readonly StorefrontTemplate[];
 }) {
-  const slides: Slide[] = collection.flatMap((item) =>
-    item.views.map((view) => ({
-      ...view,
-      templateId: item.templateId,
-      name: item.name,
-    })),
-  );
-  const track = useRef<HTMLOListElement>(null);
+  if (!collection.length)
+    return (
+      <p className="home-empty">The first invitation preview is coming soon.</p>
+    );
+  if (collection.length === 1)
+    return <TemplateFeature template={collection[0]} />;
+
+  return <TemplateTrack templates={collection} />;
+}
+
+function TemplateTrack({
+  templates,
+}: {
+  templates: readonly StorefrontTemplate[];
+}) {
+  const track = useRef<HTMLUListElement>(null);
   const [active, setActive] = useState(0);
   const drag = useRef<{
     pointerId: number;
@@ -56,8 +91,8 @@ export function TemplateCarousel({
 
   function go(index: number) {
     const element = track.current;
-    if (!element || !slides.length) return;
-    const next = Math.max(0, Math.min(slides.length - 1, index));
+    if (!element) return;
+    const next = Math.max(0, Math.min(templates.length - 1, index));
     const reduced = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     ).matches;
@@ -66,19 +101,19 @@ export function TemplateCarousel({
       behavior: reduced ? "instant" : "smooth",
     });
   }
-  function key(event: KeyboardEvent<HTMLOListElement>) {
+  function key(event: KeyboardEvent<HTMLUListElement>) {
     if (event.target !== event.currentTarget) return;
     const target = {
       ArrowLeft: active - 1,
       ArrowRight: active + 1,
       Home: 0,
-      End: slides.length - 1,
+      End: templates.length - 1,
     }[event.key];
     if (target === undefined) return;
     event.preventDefault();
     go(target);
   }
-  function startDrag(event: PointerEvent<HTMLOListElement>) {
+  function startDrag(event: PointerEvent<HTMLUListElement>) {
     suppressClick.current = false;
     if (
       event.pointerType !== "mouse" ||
@@ -93,7 +128,7 @@ export function TemplateCarousel({
       moving: false,
     };
   }
-  function moveDrag(event: PointerEvent<HTMLOListElement>) {
+  function moveDrag(event: PointerEvent<HTMLUListElement>) {
     const start = drag.current;
     const element = event.currentTarget;
     if (!start || start.pointerId !== event.pointerId) return;
@@ -110,7 +145,7 @@ export function TemplateCarousel({
     }
     element.scrollLeft = start.scroll - delta;
   }
-  function endDrag(event: PointerEvent<HTMLOListElement>) {
+  function endDrag(event: PointerEvent<HTMLUListElement>) {
     const start = drag.current;
     if (!start || start.pointerId !== event.pointerId) return;
     drag.current = null;
@@ -130,11 +165,6 @@ export function TemplateCarousel({
     return () => observer.disconnect();
   }, []);
 
-  if (!slides.length)
-    return (
-      <p className="home-empty">The first invitation preview is coming soon.</p>
-    );
-
   return (
     <div
       className="home-carousel"
@@ -145,12 +175,12 @@ export function TemplateCarousel({
       <div className="home-carousel-controls">
         <span className="home-carousel-count" aria-live="polite">
           {active + 1} <span aria-hidden="true">/</span>
-          <span className="sr-only"> of </span> {slides.length}
+          <span className="sr-only"> of </span> {templates.length}
         </span>
         <div>
           <button
             type="button"
-            aria-label="Previous preview"
+            aria-label="Previous template"
             aria-controls="template-previews"
             aria-disabled={active === 0}
             onClick={() => {
@@ -161,23 +191,23 @@ export function TemplateCarousel({
           </button>
           <button
             type="button"
-            aria-label="Next preview"
+            aria-label="Next template"
             aria-controls="template-previews"
-            aria-disabled={active === slides.length - 1}
+            aria-disabled={active === templates.length - 1}
             onClick={() => {
-              if (active < slides.length - 1) go(active + 1);
+              if (active < templates.length - 1) go(active + 1);
             }}
           >
             →
           </button>
         </div>
       </div>
-      <ol
+      <ul
         className="home-carousel-track"
         id="template-previews"
         ref={track}
         tabIndex={0}
-        aria-label="Invitation preview slides"
+        aria-label="Invitation templates"
         onKeyDown={key}
         onScroll={({ currentTarget }) => setActive(nearest(currentTarget))}
         onPointerDown={startDrag}
@@ -193,32 +223,12 @@ export function TemplateCarousel({
           }
         }}
       >
-        {slides.map((slide) => (
-          <li
-            className="home-slide"
-            key={slide.id}
-            data-template-id={slide.templateId}
-            data-view-id={slide.id}
-          >
-            <div className="home-slide-art" data-view={slide.id}>
-              <Image
-                src={slide.image}
-                alt={slide.alt}
-                fill
-                sizes="(min-width: 1100px) 600px, (min-width: 760px) 49vw, 80vw"
-                draggable={false}
-              />
-            </div>
-            <div className="home-slide-meta">
-              <div>
-                {collection.length > 1 && <p>{slide.name}</p>}
-                <h3>{slide.label}</h3>
-              </div>
-              <a href={slide.href}>{slide.action}</a>
-            </div>
+        {templates.map((template) => (
+          <li className="home-slide" key={template.templateId}>
+            <TemplateFeature template={template} />
           </li>
         ))}
-      </ol>
+      </ul>
     </div>
   );
 }

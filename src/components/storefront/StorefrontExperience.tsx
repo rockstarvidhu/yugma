@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useRef, type MouseEvent, type ReactNode } from "react";
+import {
+  useLayoutEffect,
+  useRef,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import { StorefrontHeader } from "./StorefrontHeader";
 
 function interval(progress: number, start: number, end: number) {
@@ -11,7 +16,7 @@ function interval(progress: number, start: number, end: number) {
 export function StorefrontExperience({ children }: { children: ReactNode }) {
   const root = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = root.current;
     const scene = element?.querySelector<HTMLElement>(".home-moment");
     const stage = element?.querySelector<HTMLElement>(".home-stage");
@@ -24,15 +29,18 @@ export function StorefrontExperience({ children }: { children: ReactNode }) {
     const desktop = window.matchMedia("(min-width: 900px)");
     let frame = 0;
     let travel = 1;
+    let sceneTop = 0;
+    let sceneHeight = 0;
+    let headerHeight = 0;
     let animate = false;
     let nav: boolean | undefined;
     const update = () => {
       frame = 0;
-      const top = scene.getBoundingClientRect().top;
-      const progress = Math.max(0, Math.min(1, -top / travel));
+      const distance = window.scrollY - sceneTop;
+      const progress = Math.max(0, Math.min(1, distance / travel));
       const sand = animate
         ? progress >= 0.93
-        : scene.getBoundingClientRect().bottom <= header.offsetHeight;
+        : distance >= sceneHeight - headerHeight;
       if (nav !== sand) {
         nav = sand;
         element.dataset.sand = String(sand);
@@ -42,7 +50,7 @@ export function StorefrontExperience({ children }: { children: ReactNode }) {
       element.style.setProperty(
         "--moment-zoom",
         String(
-          1 + (desktop.matches ? 0.09 : 0.08) * interval(progress, 0.15, 0.55),
+          1 + (desktop.matches ? 0.09 : 0.075) * interval(progress, 0.15, 0.55),
         ),
       );
       element.style.setProperty(
@@ -69,7 +77,7 @@ export function StorefrontExperience({ children }: { children: ReactNode }) {
       );
       element.style.setProperty(
         "--collection-delay",
-        `${35 * (1 - interval(progress, 0.3, 0.88))}svh`,
+        `${32 * (1 - interval(progress, 0.32, 0.88))}svh`,
       );
     };
     const schedule = () => {
@@ -80,7 +88,10 @@ export function StorefrontExperience({ children }: { children: ReactNode }) {
         return;
       animate = Boolean(photo?.naturalWidth) && !reduced.matches;
       element.dataset.motion = animate ? "full" : "static";
-      travel = Math.max(1, scene.offsetHeight - stage.offsetHeight);
+      sceneTop = scene.getBoundingClientRect().top + window.scrollY;
+      sceneHeight = scene.offsetHeight;
+      headerHeight = header.offsetHeight;
+      travel = Math.max(1, sceneHeight - stage.offsetHeight);
       update();
     };
     const observer =

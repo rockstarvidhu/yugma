@@ -1,5 +1,7 @@
 # Responsive homepage hero
 
+This report describes the earlier responsive hero. See [the final visual review](home-final-review.md) for the current photo rights gate, featured invitation and PR integration.
+
 [Draft PR #13](https://github.com/rockstarvidhu/yugma/pull/13) continues on `feat/home-collection` from `33c5c4d207fb7ba1c605eefa872165fca9d4ea36`. The change is limited to the hero, its handoff and the carousel’s product labeling.
 
 ## Photography and branding

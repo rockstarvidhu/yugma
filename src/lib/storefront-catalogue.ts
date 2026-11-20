@@ -10,14 +10,7 @@ export type StorefrontTemplate = {
   demoUrl: `/demo/${string}`;
   personalizeUrl: `/demo/${string}`;
   alternateDemoUrls: readonly `/demo/${string}`[];
-  views: readonly {
-    id: string;
-    label: string;
-    image: string;
-    alt: string;
-    href: `/demo/${string}`;
-    action: string;
-  }[];
+  preview: { src: string; alt: string; width: number; height: number };
   availability: "demo-available" | "in-development";
   purchaseAvailable: false;
   createUrl: null;
@@ -28,30 +21,18 @@ const afterglow: StorefrontTemplate = {
   templateId: "afterglow",
   name: "Afterglow",
   description:
-    "A photographic beginning, warm ivory pages and thoughtful details for your celebration. Includes the Heirloom cover.",
+    "A photographic cover and warm ivory pages for your story, ceremonies and wedding details.",
   paletteLabel: "Ivory & burgundy",
   moodLabel: "Warm & timeless",
   demoUrl: "/demo/afterglow",
   personalizeUrl: "/demo/afterglow",
   alternateDemoUrls: ["/demo/heirloom"],
-  views: [
-    {
-      id: "heirloom-cover",
-      label: "Heirloom cover",
-      image: "/images/storefront/heirloom-cover.webp",
-      alt: "Tara and Neel's Heirloom invitation cover with a photograph and their wedding date",
-      href: "/demo/heirloom",
-      action: "View cover demo",
-    },
-    {
-      id: "afterglow-celebration",
-      label: "Celebration details",
-      image: "/images/storefront/afterglow-celebration.webp",
-      alt: "Afterglow's ivory invitation page showing the celebration schedule",
-      href: "/demo/afterglow#celebration",
-      action: "View details demo",
-    },
-  ],
+  preview: {
+    src: "/images/storefront/heirloom-cover.webp",
+    alt: "Afterglow invitation cover for the fictional wedding of Tara and Neel",
+    width: 592,
+    height: 833,
+  },
   availability: "demo-available",
   purchaseAvailable: false,
   createUrl: null,

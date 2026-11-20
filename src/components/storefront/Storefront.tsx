@@ -25,12 +25,14 @@ const steps = [
   },
 ] as const;
 
-export function Storefront() {
+export function Storefront({
+  photographic = process.env.NODE_ENV === "development",
+}: { photographic?: boolean } = {}) {
   const collection = getStorefrontCollection();
   return (
     <StorefrontExperience>
       <main>
-        <HomepageHeroSequence />
+        <HomepageHeroSequence photographic={photographic} />
         <section
           className="home-collection"
           id="templates"
@@ -39,15 +41,7 @@ export function Storefront() {
         >
           <div className="home-shell">
             <header className="home-collection-head">
-              <div>
-                <h2 id="collection-heading">The YUGMA Collection</h2>
-                {collection.length === 1 && (
-                  <p>
-                    <strong>{collection[0].name}</strong> · One design, two
-                    views.
-                  </p>
-                )}
-              </div>
+              <h2 id="collection-heading">The YUGMA Collection</h2>
             </header>
             <TemplateCarousel collection={collection} />
           </div>
