@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import {
-  useEffect,
   useId,
   useRef,
   useState,
@@ -32,66 +31,11 @@ function TemplateTrack({
 }) {
   const trackId = useId();
   const [active, setActive] = useState(0);
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const audio = useRef<AudioContext | null>(null);
-  const lastBlup = useRef(-Infinity);
   const gesture = useRef<{ id: number; x: number; y: number } | null>(null);
   const suppressClick = useRef(false);
   const count = templates.length;
   const selected = templates[active];
   const half = Math.floor(count / 2);
-
-  useEffect(() => {
-    return () => {
-      const context = audio.current;
-      audio.current = null;
-      if (context) void context.close().catch(() => undefined);
-    };
-  }, []);
-
-  function unlockAudio() {
-    if (!soundEnabled || !window.AudioContext) return;
-    const context = (audio.current ??= new AudioContext());
-    if (context.state === "suspended")
-      void context.resume().catch(() => undefined);
-  }
-
-  function playHover(event: PointerEvent<HTMLElement>) {
-    const now = performance.now();
-    if (
-      event.pointerType !== "mouse" ||
-      event.buttons !== 0 ||
-      !soundEnabled ||
-      !window.AudioContext ||
-      navigator.userActivation?.hasBeenActive === false ||
-      now - lastBlup.current < 170
-    )
-      return;
-
-    lastBlup.current = now;
-    const context = (audio.current ??= new AudioContext());
-    const play = () => {
-      if (context.state !== "running") return;
-      const start = context.currentTime;
-      const tone = context.createOscillator();
-      const volume = context.createGain();
-      tone.type = "sine";
-      tone.frequency.setValueAtTime(440, start);
-      tone.frequency.exponentialRampToValueAtTime(230, start + 0.08);
-      volume.gain.setValueAtTime(0.0001, start);
-      volume.gain.exponentialRampToValueAtTime(0.045, start + 0.012);
-      volume.gain.exponentialRampToValueAtTime(0.0001, start + 0.09);
-      tone.connect(volume).connect(context.destination);
-      tone.onended = () => {
-        tone.disconnect();
-        volume.disconnect();
-      };
-      tone.start(start);
-      tone.stop(start + 0.1);
-    };
-    if (context.state === "running") play();
-    else void context.resume().then(play, () => undefined);
-  }
 
   function move(delta: number) {
     setActive((current) => (current + delta + count) % count);
@@ -167,8 +111,6 @@ function TemplateTrack({
       role="group"
       aria-label="Invitation previews"
       aria-roledescription="carousel"
-      onPointerDownCapture={unlockAudio}
-      onKeyDownCapture={unlockAudio}
     >
       <div className="home-carousel-stage">
         <ul
@@ -176,7 +118,6 @@ function TemplateTrack({
           id={trackId}
           tabIndex={0}
           aria-label="Invitation templates"
-          onPointerEnter={playHover}
           onKeyDown={onKeyDown}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -194,7 +135,10 @@ function TemplateTrack({
           }}
         >
           {templates.map((template, index) => {
-            const offset = ((index - active + count + half) % count) - half;
+            const offset =
+              count === 2
+                ? index - active
+                : ((index - active + count + half) % count) - half;
             const depth = Math.abs(offset);
             return (
               <li
@@ -213,7 +157,6 @@ function TemplateTrack({
                   tabIndex={-1}
                   aria-label={`Select ${template.name}`}
                   aria-pressed={index === active}
-                  onPointerEnter={playHover}
                   onClick={() => setActive(index)}
                 >
                   <Image
@@ -251,37 +194,19 @@ function TemplateTrack({
       <div className="home-carousel-footer">
         <div className="home-carousel-caption" key={selected.templateId}>
           <h3>{selected.name}</h3>
-          {selected.availability === "demo-available" ? (
-            <a
-              href={selected.demoUrl}
-              aria-label={`Preview Experience: ${selected.name}`}
-              className="home-button home-carousel-preview"
-            >
-              Preview Experience
-            </a>
-          ) : (
-            <p className="home-carousel-status">Coming soon</p>
-          )}
-        </div>
-        <div className="home-carousel-meta">
-          <span className="home-carousel-count" aria-hidden="true">
-            {active + 1} / {count}
-          </span>
-          <button
-            type="button"
-            className="home-carousel-sound"
-            aria-label="Carousel sound"
-            aria-pressed={soundEnabled}
-            onClick={() => setSoundEnabled((enabled) => !enabled)}
+          <a
+            href={selected.demoUrl}
+            aria-label={`Preview Experience: ${selected.name}`}
+            className="home-button home-carousel-preview"
           >
-            {soundEnabled ? "Sound on" : "Sound off"}
-          </button>
+            Preview Experience
+          </a>
         </div>
+        <span className="home-carousel-count" aria-hidden="true">
+          {active + 1} / {count}
+        </span>
         <span className="sr-only" aria-live="polite">
-          {selected.name}, {active + 1} of {count}.{" "}
-          {selected.availability === "coming-soon"
-            ? "Coming soon."
-            : "Demo available."}
+          {selected.name}, {active + 1} of {count}. Demo available.
         </span>
       </div>
     </div>

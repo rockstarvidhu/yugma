@@ -98,8 +98,9 @@ export function Storefront({
           <p>© YUGMA</p>
         </div>
         <p className="home-shell home-footer-note">
-          Customer support, terms, privacy and refund policies will be available
-          before launch.
+          <a href={storefrontRoutes.publicSupport}>Contact YUGMA on GitHub</a>{" "}
+          for general questions. Terms, privacy and refund policies will be
+          available before launch.
         </p>
       </footer>
     </StorefrontExperience>

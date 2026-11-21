@@ -369,11 +369,12 @@ async function checkHomepage() {
       "/templates",
     );
     const track = gallery.getByRole("list", { name: "Invitation templates" });
-    assert.equal(await track.getByRole("listitem").count(), 5);
+    assert.equal(await track.getByRole("listitem").count(), 2);
     const nextTemplate = gallery.getByRole("button", { name: "Next template" });
     await nextTemplate.click();
-    await gallery.getByRole("heading", { name: "Jasmine Hour" }).waitFor();
-    assert(await gallery.getByText("Coming soon", { exact: true }).isVisible());
+    await gallery
+      .getByRole("heading", { name: "Afterglow celebrations" })
+      .waitFor();
     await gallery.getByRole("button", { name: "Previous template" }).click();
     assert.equal(
       await gallery.getByRole("heading", { name: "Afterglow" }).count(),

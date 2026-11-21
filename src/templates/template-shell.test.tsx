@@ -9,13 +9,11 @@ import AfterglowDemo, { metadata } from "@/app/demo/afterglow/page";
 import HeirloomDemo, {
   metadata as heirloomMetadata,
 } from "@/app/demo/heirloom/page";
-import { getSupabaseConfig } from "@/lib/auth/client";
-import { canStartAfterglowTestDraft } from "@/lib/checkout/gateway";
+import { canCreatePrivateDraft } from "@/lib/auth/service";
 import type { InvitationTemplateProps } from "./types";
 
-vi.mock("@/lib/auth/client", () => ({ getSupabaseConfig: vi.fn(() => null) }));
-vi.mock("@/lib/checkout/gateway", () => ({
-  canStartAfterglowTestDraft: vi.fn(() => false),
+vi.mock("@/lib/auth/service", () => ({
+  canCreatePrivateDraft: vi.fn(() => false),
 }));
 
 afterEach(() => {
@@ -214,11 +212,7 @@ describe("template registry and renderer", () => {
     expect(metadata.robots).toEqual({ index: false, follow: false });
   });
   it("opens the watermarked editor from the catalogue link and offers Studio when configured", async () => {
-    vi.mocked(getSupabaseConfig).mockReturnValue({
-      url: "https://example.com",
-      key: "sb_publishable_test",
-    });
-    vi.mocked(canStartAfterglowTestDraft).mockReturnValue(true);
+    vi.mocked(canCreatePrivateDraft).mockReturnValue(true);
 
     render(
       await AfterglowDemo({

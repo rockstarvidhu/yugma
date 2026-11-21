@@ -4,7 +4,7 @@ import { BrandLogo } from "@/components/brand/BrandLogo";
 import { Button } from "@/components/ui/Button";
 import { Container } from "@/components/ui/Container";
 import { getServerAuth, requireStudioUser } from "@/lib/auth/server";
-import { canStartAfterglowTestDraft } from "@/lib/checkout/gateway";
+import { canCreatePrivateDraft } from "@/lib/auth/service";
 import { draftIdSchema } from "@/lib/drafts/contract";
 import { listDrafts } from "@/lib/drafts/store";
 import { signOut, startAfterglowDraft } from "./actions";
@@ -70,7 +70,7 @@ export default async function StudioPage({
               More drafts
             </Link>
           )}
-          {canStartAfterglowTestDraft() && (
+          {canCreatePrivateDraft() && (
             <form action={startAfterglowDraft}>
               <Button type="submit">Start an Afterglow draft</Button>
             </form>

@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { Container } from "@/components/ui/Container";
-import { getStorefrontCollection } from "@/lib/storefront-catalogue";
+import { getStorefrontCatalogue } from "@/lib/storefront-catalogue";
 import { storefrontRoutes } from "@/lib/storefront-routes";
 import "./catalogue.css";
 
@@ -38,7 +38,7 @@ const priceFormat = new Intl.NumberFormat("en-IN", {
 });
 
 export default function TemplatesPage() {
-  const collection = getStorefrontCollection();
+  const collection = getStorefrontCatalogue();
 
   return (
     <div className="yugma-brand catalogue-page min-h-screen">
@@ -78,60 +78,51 @@ export default function TemplatesPage() {
                 >
                   <article className="catalogue-card">
                     <div className="catalogue-details">
-                      {template.availability === "demo-available" ? (
-                        <>
-                          <p className="catalogue-status">Demo available</p>
-                          <h2>{template.name}</h2>
-                          <p className="catalogue-palette">
-                            {template.paletteLabel}
-                          </p>
-                          <p className="catalogue-description">
-                            {template.description}
-                          </p>
-                          {template.price.amountMinor !== null && (
-                            <p className="catalogue-price">
-                              <strong>
-                                {priceFormat.format(
-                                  template.price.amountMinor / 100,
-                                )}{" "}
-                                one-time
-                              </strong>{" "}
-                              in Test Mode
-                            </p>
-                          )}
-                          <div className="catalogue-actions">
-                            <Link
-                              href={template.demoUrl}
-                              className="catalogue-primary"
-                            >
-                              Try Demo
-                            </Link>
-                            <Link
-                              href={template.personalizeUrl}
-                              className="catalogue-secondary"
-                            >
-                              Personalize
-                            </Link>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <p className="catalogue-status">Coming soon</p>
-                          <h2 className="catalogue-coming-soon">
-                            {template.name}
-                          </h2>
-                        </>
+                      <p className="catalogue-status">Demo available</p>
+                      <h2>{template.name}</h2>
+                      <p className="catalogue-palette">
+                        {template.paletteLabel}
+                      </p>
+                      <p className="catalogue-description">
+                        {template.description}
+                      </p>
+                      {template.price.amountMinor !== null && (
+                        <p className="catalogue-price">
+                          <strong>
+                            {priceFormat.format(
+                              template.price.amountMinor / 100,
+                            )}{" "}
+                            one-time
+                          </strong>{" "}
+                          in Test Mode
+                        </p>
                       )}
+                      <div className="catalogue-actions">
+                        <Link
+                          href={template.demoUrl}
+                          className="catalogue-primary"
+                        >
+                          Try Demo
+                        </Link>
+                        <Link
+                          href={template.personalizeUrl}
+                          className="catalogue-secondary"
+                        >
+                          Personalize
+                        </Link>
+                        <Link
+                          href={template.heirloomSampleUrl}
+                          className="catalogue-secondary"
+                        >
+                          Heirloom sample
+                        </Link>
+                      </div>
                     </div>
                     <div className="catalogue-artwork">
                       <Image
                         {...template.preview}
                         alt={template.preview.alt}
-                        sizes={
-                          template.availability === "demo-available"
-                            ? "(min-width: 1024px) 352px, (min-width: 768px) 43vw, (min-width: 576px) 352px, 82vw"
-                            : "(min-width: 760px) 224px, (min-width: 368px) 37vw, 78vw"
-                        }
+                        sizes="(min-width: 1024px) 352px, (min-width: 768px) 43vw, (min-width: 576px) 352px, 82vw"
                       />
                     </div>
                   </article>

@@ -16,13 +16,6 @@ export function getRazorpayTestConfig() {
   return { keyId, keySecret };
 }
 
-export function canStartAfterglowTestDraft() {
-  return (
-    getRazorpayTestConfig() !== null &&
-    process.env.SUPABASE_SECRET_KEY?.startsWith("sb_secret_") === true
-  );
-}
-
 export function getTestGateway() {
   const config = getRazorpayTestConfig();
   if (!config) throw new Error("Razorpay Test Mode is unavailable");

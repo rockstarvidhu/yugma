@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { DemoPreview } from "@/components/preview/DemoPreview";
-import { getSupabaseConfig } from "@/lib/auth/client";
-import { canStartAfterglowTestDraft } from "@/lib/checkout/gateway";
+import { canCreatePrivateDraft } from "@/lib/auth/service";
 
 export const metadata: Metadata = {
   title: "Afterglow demo",
@@ -17,9 +16,7 @@ export default async function AfterglowDemo({
   return (
     <DemoPreview
       initiallyEditing={personalize === "1"}
-      studioAvailable={
-        getSupabaseConfig() !== null && canStartAfterglowTestDraft()
-      }
+      studioAvailable={canCreatePrivateDraft()}
     />
   );
 }

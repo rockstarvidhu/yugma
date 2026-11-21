@@ -7,25 +7,13 @@ type StorefrontTemplate = {
   name: string;
   description: string;
   paletteLabel: string;
-  moodLabel: string;
   demoUrl: `/demo/${string}`;
   personalizeUrl: `/demo/${string}?personalize=1#preview-editor`;
-  alternateDemoUrls: readonly `/demo/${string}`[];
+  heirloomSampleUrl: "/demo/heirloom";
   preview: { src: string; alt: string; width: number; height: number };
   availability: "demo-available";
-  purchaseAvailable: false;
-  createUrl: null;
   price: { currency: "INR"; billing: "one-time"; amountMinor: number | null };
 };
-
-export type StorefrontCollectionItem =
-  | StorefrontTemplate
-  | {
-      templateId: string;
-      name: string;
-      availability: "coming-soon";
-      preview: StorefrontTemplate["preview"];
-    };
 
 const afterglow: StorefrontTemplate = {
   templateId: "afterglow",
@@ -33,10 +21,9 @@ const afterglow: StorefrontTemplate = {
   description:
     "A photographic cover and warm ivory pages for your story, ceremonies and wedding details.",
   paletteLabel: "Ivory & burgundy",
-  moodLabel: "Warm & timeless",
   demoUrl: "/demo/afterglow",
   personalizeUrl: "/demo/afterglow?personalize=1#preview-editor",
-  alternateDemoUrls: ["/demo/heirloom"],
+  heirloomSampleUrl: "/demo/heirloom",
   preview: {
     src: "/images/storefront/heirloom-cover.webp",
     alt: "Afterglow invitation cover for the fictional wedding of Tara and Neel",
@@ -44,8 +31,6 @@ const afterglow: StorefrontTemplate = {
     height: 833,
   },
   availability: "demo-available",
-  purchaseAvailable: false,
-  createUrl: null,
   price: {
     currency: "INR",
     billing: "one-time",
@@ -53,45 +38,33 @@ const afterglow: StorefrontTemplate = {
   },
 };
 
-const upcoming: readonly StorefrontCollectionItem[] = [
-  {
-    templateId: "jasmine-hour",
-    name: "Jasmine Hour",
-    image: "coming-soon.webp",
-    alt: "Ivory stationery with rose ribbon, jasmine and wedding rings",
-  },
-  {
-    templateId: "moonlit-vows",
-    name: "Moonlit Vows",
-    image: "moonlit-vows.webp",
-    alt: "Silver wedding bands and a white flower on midnight-blue silk",
-  },
-  {
-    templateId: "marigold-reverie",
-    name: "Marigold Reverie",
-    image: "marigold-reverie.webp",
-    alt: "Orange marigolds and a brass bowl in warm sunlight",
-  },
-  {
-    templateId: "letters-at-dusk",
-    name: "Letters at Dusk",
-    image: "letters-at-dusk.webp",
-    alt: "A sage envelope and a pressed flower on lavender fabric",
-  },
-].map(({ templateId, name, image, alt }) => ({
-  templateId,
-  name,
-  availability: "coming-soon",
-  preview: {
-    src: `/images/storefront/${image}`,
-    alt,
-    width: 720,
-    height: 1008,
-  },
-}));
+export type StorefrontCollectionItem = Pick<
+  StorefrontTemplate,
+  "name" | "preview"
+> & {
+  templateId: string;
+  demoUrl: string;
+};
+
+export function getStorefrontCatalogue(registry = templateRegistry) {
+  return registry.get(afterglow.templateId) ? [afterglow] : [];
+}
 
 export function getStorefrontCollection(
   registry = templateRegistry,
 ): readonly StorefrontCollectionItem[] {
-  return registry.get(afterglow.templateId) ? [afterglow, ...upcoming] : [];
+  return getStorefrontCatalogue(registry).flatMap((template) => [
+    template,
+    {
+      templateId: "afterglow-celebration-preview",
+      name: "Afterglow celebrations",
+      demoUrl: "/demo/afterglow#celebration",
+      preview: {
+        src: "/images/storefront/afterglow-celebration.webp",
+        alt: "Celebrations section of the Afterglow sample invitation",
+        width: 592,
+        height: 438,
+      },
+    },
+  ]);
 }

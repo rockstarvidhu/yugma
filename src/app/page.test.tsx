@@ -68,13 +68,10 @@ describe("YUGMA brand foundations", () => {
       }),
     ).toBeVisible();
     const cards = screen.getAllByRole("article");
-    expect(cards).toHaveLength(5);
-    const upcoming = within(cards[1]);
+    expect(cards).toHaveLength(1);
     expect(
-      upcoming.getByRole("heading", { name: "Jasmine Hour" }),
-    ).toBeVisible();
-    expect(screen.getAllByText("Coming soon")).toHaveLength(4);
-    expect(upcoming.queryByRole("link")).not.toBeInTheDocument();
+      within(cards[0]).getByRole("link", { name: "Heirloom sample" }),
+    ).toHaveAttribute("href", "/demo/heirloom");
     expect(screen.getByText("₹899 one-time")).toBeVisible();
     expect(screen.getByText("in Test Mode")).toBeVisible();
     expect(screen.getByRole("link", { name: "Try Demo" })).toHaveAttribute(

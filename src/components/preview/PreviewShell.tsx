@@ -76,7 +76,7 @@ export function PreviewShell({
           {studioAvailable && (
             <p className="preview-studio">
               <Link href="/studio">Open private Studio</Link> to start a
-              separate draft for Test Mode.
+              separate draft. Your preview edits stay on this page.
             </p>
           )}
         </div>
