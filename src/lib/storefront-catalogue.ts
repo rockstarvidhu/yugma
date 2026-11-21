@@ -1,20 +1,18 @@
+import { AFTERGLOW_PRICE_PAISE } from "@/lib/checkout/contract";
 import { templateRegistry } from "@/templates/registry";
 
 /** Presentation metadata only. Invitation content stays in the canonical schema. */
-export type StorefrontTemplate = {
+type StorefrontTemplate = {
   templateId: string;
   name: string;
   description: string;
   paletteLabel: string;
-  moodLabel: string;
   demoUrl: `/demo/${string}`;
-  personalizeUrl: `/demo/${string}`;
-  alternateDemoUrls: readonly `/demo/${string}`[];
+  personalizeUrl: `/demo/${string}?personalize=1#preview-editor`;
+  heirloomSampleUrl: "/demo/heirloom";
   preview: { src: string; alt: string; width: number; height: number };
-  availability: "demo-available" | "in-development";
-  purchaseAvailable: false;
-  createUrl: null;
-  price: { currency: "INR"; billing: "one-time"; amountMinor: null };
+  availability: "demo-available";
+  price: { currency: "INR"; billing: "one-time"; amountMinor: number | null };
 };
 
 const afterglow: StorefrontTemplate = {
@@ -23,10 +21,9 @@ const afterglow: StorefrontTemplate = {
   description:
     "A photographic cover and warm ivory pages for your story, ceremonies and wedding details.",
   paletteLabel: "Ivory & burgundy",
-  moodLabel: "Warm & timeless",
   demoUrl: "/demo/afterglow",
-  personalizeUrl: "/demo/afterglow",
-  alternateDemoUrls: ["/demo/heirloom"],
+  personalizeUrl: "/demo/afterglow?personalize=1#preview-editor",
+  heirloomSampleUrl: "/demo/heirloom",
   preview: {
     src: "/images/storefront/heirloom-cover.webp",
     alt: "Afterglow invitation cover for the fictional wedding of Tara and Neel",
@@ -34,12 +31,40 @@ const afterglow: StorefrontTemplate = {
     height: 833,
   },
   availability: "demo-available",
-  purchaseAvailable: false,
-  createUrl: null,
-  price: { currency: "INR", billing: "one-time", amountMinor: null },
+  price: {
+    currency: "INR",
+    billing: "one-time",
+    amountMinor: AFTERGLOW_PRICE_PAISE,
+  },
 };
 
-/** Only expose metadata when the actual renderer has this template registered. */
-export function getStorefrontCollection(registry = templateRegistry) {
+export type StorefrontCollectionItem = Pick<
+  StorefrontTemplate,
+  "name" | "preview"
+> & {
+  templateId: string;
+  demoUrl: string;
+};
+
+export function getStorefrontCatalogue(registry = templateRegistry) {
   return registry.get(afterglow.templateId) ? [afterglow] : [];
+}
+
+export function getStorefrontCollection(
+  registry = templateRegistry,
+): readonly StorefrontCollectionItem[] {
+  return getStorefrontCatalogue(registry).flatMap((template) => [
+    template,
+    {
+      templateId: "afterglow-celebration-preview",
+      name: "Afterglow celebrations",
+      demoUrl: "/demo/afterglow#celebration",
+      preview: {
+        src: "/images/storefront/afterglow-celebration.webp",
+        alt: "Celebrations section of the Afterglow sample invitation",
+        width: 592,
+        height: 438,
+      },
+    },
+  ]);
 }

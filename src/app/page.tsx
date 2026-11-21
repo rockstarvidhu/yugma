@@ -17,12 +17,10 @@ const accent = Instrument_Serif({
 
 export const metadata: Metadata = {
   title: { absolute: "YUGMA — Digital wedding invitations" },
-  description:
-    "Beautifully crafted digital invitations, made to tell your story.",
+  description: "Digital wedding invitations for the story only you can tell.",
   openGraph: {
     title: "YUGMA",
-    description:
-      "Beautifully crafted digital invitations, made to tell your story.",
+    description: "Digital wedding invitations for the story only you can tell.",
     type: "website",
     images: [
       {

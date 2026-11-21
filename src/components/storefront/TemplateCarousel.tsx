@@ -2,74 +2,24 @@
 
 import Image from "next/image";
 import {
-  useEffect,
+  useId,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
   type PointerEvent,
 } from "react";
-import type { StorefrontTemplate } from "@/lib/storefront-catalogue";
+import type { StorefrontCollectionItem } from "@/lib/storefront-catalogue";
 
-function TemplateFeature({ template }: { template: StorefrontTemplate }) {
-  return (
-    <article className="home-featured" data-template-id={template.templateId}>
-      <div className="home-featured-art">
-        <Image
-          src={template.preview.src}
-          alt={template.preview.alt}
-          width={template.preview.width}
-          height={template.preview.height}
-          sizes="(min-width: 1080px) 490px, (min-width: 760px) 45vw, 90vw"
-          draggable={false}
-        />
-      </div>
-      <div className="home-featured-copy">
-        <h3>{template.name}</h3>
-        <p>{template.description}</p>
-        {template.availability === "demo-available" ? (
-          <a
-            href={template.demoUrl}
-            aria-label={`Preview Experience: ${template.name}`}
-            className="home-button home-featured-action"
-          >
-            Preview Experience
-          </a>
-        ) : (
-          <p className="home-featured-status">In development</p>
-        )}
-      </div>
-    </article>
-  );
-}
-
-function positions(element: HTMLUListElement) {
-  const max = element.scrollWidth - element.clientWidth;
-  return Array.from(element.children, (child) =>
-    Math.min(max, (child as HTMLElement).offsetLeft),
-  );
-}
-function nearest(element: HTMLUListElement) {
-  const points = positions(element);
-  return points.reduce(
-    (best, point, index) =>
-      Math.abs(point - element.scrollLeft) <
-      Math.abs(points[best] - element.scrollLeft)
-        ? index
-        : best,
-    0,
-  );
-}
 export function TemplateCarousel({
   collection,
 }: {
-  collection: readonly StorefrontTemplate[];
+  collection: readonly StorefrontCollectionItem[];
 }) {
-  if (!collection.length)
+  if (collection.length === 0)
     return (
       <p className="home-empty">The first invitation preview is coming soon.</p>
     );
-  if (collection.length === 1)
-    return <TemplateFeature template={collection[0]} />;
 
   return <TemplateTrack templates={collection} />;
 }
@@ -77,93 +27,83 @@ export function TemplateCarousel({
 function TemplateTrack({
   templates,
 }: {
-  templates: readonly StorefrontTemplate[];
+  templates: readonly StorefrontCollectionItem[];
 }) {
-  const track = useRef<HTMLUListElement>(null);
+  const trackId = useId();
   const [active, setActive] = useState(0);
-  const drag = useRef<{
-    pointerId: number;
-    x: number;
-    scroll: number;
-    moving: boolean;
-  } | null>(null);
+  const gesture = useRef<{ id: number; x: number; y: number } | null>(null);
   const suppressClick = useRef(false);
+  const count = templates.length;
+  const selected = templates[active];
+  const half = Math.floor(count / 2);
 
-  function go(index: number) {
-    const element = track.current;
-    if (!element) return;
-    const next = Math.max(0, Math.min(templates.length - 1, index));
-    const reduced = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
-    element.scrollTo({
-      left: positions(element)[next],
-      behavior: reduced ? "instant" : "smooth",
-    });
+  function move(delta: number) {
+    setActive((current) => (current + delta + count) % count);
   }
-  function key(event: KeyboardEvent<HTMLUListElement>) {
-    if (event.target !== event.currentTarget) return;
-    const target = {
-      ArrowLeft: active - 1,
-      ArrowRight: active + 1,
-      Home: 0,
-      End: templates.length - 1,
-    }[event.key];
-    if (target === undefined) return;
+
+  function onKeyDown(event: KeyboardEvent<HTMLUListElement>) {
+    if (event.altKey || event.metaKey || event.ctrlKey) return;
+    switch (event.key) {
+      case "ArrowLeft":
+        move(-1);
+        break;
+      case "ArrowRight":
+        move(1);
+        break;
+      case "Home":
+        setActive(0);
+        break;
+      case "End":
+        setActive(count - 1);
+        break;
+      default:
+        return;
+    }
     event.preventDefault();
-    go(target);
   }
-  function startDrag(event: PointerEvent<HTMLUListElement>) {
+
+  function onPointerDown(event: PointerEvent<HTMLUListElement>) {
+    if (!event.isPrimary || event.button !== 0) return;
     suppressClick.current = false;
-    if (
-      event.pointerType !== "mouse" ||
-      event.button !== 0 ||
-      (event.target as Element).closest("a, button")
-    )
-      return;
-    drag.current = {
-      pointerId: event.pointerId,
+    gesture.current = {
+      id: event.pointerId,
       x: event.clientX,
-      scroll: event.currentTarget.scrollLeft,
-      moving: false,
+      y: event.clientY,
     };
   }
-  function moveDrag(event: PointerEvent<HTMLUListElement>) {
-    const start = drag.current;
-    const element = event.currentTarget;
-    if (!start || start.pointerId !== event.pointerId) return;
-    if (!start.moving && !(event.buttons & 1)) {
-      drag.current = null;
-      return;
-    }
-    const delta = event.clientX - start.x;
-    if (!start.moving && Math.abs(delta) < 6) return;
-    if (!start.moving) {
-      start.moving = true;
-      element.setPointerCapture(event.pointerId);
-      element.dataset.dragging = "true";
-    }
-    element.scrollLeft = start.scroll - delta;
-  }
-  function endDrag(event: PointerEvent<HTMLUListElement>) {
-    const start = drag.current;
-    if (!start || start.pointerId !== event.pointerId) return;
-    drag.current = null;
-    if (!start.moving) return;
-    const element = event.currentTarget;
-    const target = nearest(element);
-    suppressClick.current = true;
-    delete element.dataset.dragging;
-    go(target);
+
+  function onPointerMove(event: PointerEvent<HTMLUListElement>) {
+    const start = gesture.current;
+    if (!start || start.id !== event.pointerId || event.buttons === 0) return;
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    if (Math.abs(dx) < 10 || Math.abs(dx) <= Math.abs(dy)) return;
+    const track = event.currentTarget;
+    if (!track.hasPointerCapture(event.pointerId))
+      track.setPointerCapture(event.pointerId);
+    track.dataset.dragging = "true";
+    track.style.setProperty(
+      "--drag-shift",
+      `${Math.max(-30, Math.min(30, dx / 4))}px`,
+    );
   }
 
-  useEffect(() => {
-    const element = track.current;
-    if (!element || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(() => setActive(nearest(element)));
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
+  function endGesture(event: PointerEvent<HTMLUListElement>) {
+    const start = gesture.current;
+    if (!start || start.id !== event.pointerId) return;
+    gesture.current = null;
+    const track = event.currentTarget;
+    suppressClick.current = track.dataset.dragging === "true";
+    delete track.dataset.dragging;
+    track.style.removeProperty("--drag-shift");
+    if (event.type !== "pointerup") return;
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    if (Math.abs(dx) >= 32 && Math.abs(dx) > Math.abs(dy)) {
+      suppressClick.current = true;
+      move(dx < 0 ? 1 : -1);
+    }
+  }
 
   return (
     <div
@@ -172,63 +112,103 @@ function TemplateTrack({
       aria-label="Invitation previews"
       aria-roledescription="carousel"
     >
-      <div className="home-carousel-controls">
-        <span className="home-carousel-count" aria-live="polite">
-          {active + 1} <span aria-hidden="true">/</span>
-          <span className="sr-only"> of </span> {templates.length}
-        </span>
-        <div>
-          <button
-            type="button"
-            aria-label="Previous template"
-            aria-controls="template-previews"
-            aria-disabled={active === 0}
-            onClick={() => {
-              if (active > 0) go(active - 1);
-            }}
-          >
-            ←
-          </button>
-          <button
-            type="button"
-            aria-label="Next template"
-            aria-controls="template-previews"
-            aria-disabled={active === templates.length - 1}
-            onClick={() => {
-              if (active < templates.length - 1) go(active + 1);
-            }}
-          >
-            →
-          </button>
-        </div>
+      <div className="home-carousel-stage">
+        <ul
+          className="home-carousel-track"
+          id={trackId}
+          tabIndex={0}
+          aria-label="Invitation templates"
+          onKeyDown={onKeyDown}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={endGesture}
+          onPointerCancel={endGesture}
+          onLostPointerCapture={(event) => {
+            if (event.target === event.currentTarget) endGesture(event);
+          }}
+          onClickCapture={(event) => {
+            if (suppressClick.current && event.detail) {
+              suppressClick.current = false;
+              event.stopPropagation();
+              event.preventDefault();
+            }
+          }}
+        >
+          {templates.map((template, index) => {
+            const offset =
+              count === 2
+                ? index - active
+                : ((index - active + count + half) % count) - half;
+            const depth = Math.abs(offset);
+            return (
+              <li
+                className="home-slide"
+                key={template.templateId}
+                data-template-id={template.templateId}
+                data-position={offset}
+                hidden={depth > 2}
+                style={
+                  { "--offset": offset, "--depth": depth } as CSSProperties
+                }
+              >
+                <button
+                  type="button"
+                  className="home-featured-art"
+                  tabIndex={-1}
+                  aria-label={`Select ${template.name}`}
+                  aria-pressed={index === active}
+                  onClick={() => setActive(index)}
+                >
+                  <Image
+                    {...template.preview}
+                    alt={template.preview.alt}
+                    sizes="(min-width: 1000px) 235px, (min-width: 550px) 25vw, 36vw"
+                    draggable={false}
+                  />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        {count > 1 && (
+          <div className="home-carousel-controls">
+            <button
+              type="button"
+              aria-label="Previous template"
+              aria-controls={trackId}
+              onClick={() => move(-1)}
+            >
+              <span aria-hidden="true">←</span>
+            </button>
+            <button
+              type="button"
+              aria-label="Next template"
+              aria-controls={trackId}
+              onClick={() => move(1)}
+            >
+              <span aria-hidden="true">→</span>
+            </button>
+          </div>
+        )}
       </div>
-      <ul
-        className="home-carousel-track"
-        id="template-previews"
-        ref={track}
-        tabIndex={0}
-        aria-label="Invitation templates"
-        onKeyDown={key}
-        onScroll={({ currentTarget }) => setActive(nearest(currentTarget))}
-        onPointerDown={startDrag}
-        onPointerMove={moveDrag}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-        onLostPointerCapture={endDrag}
-        onClickCapture={(event) => {
-          if (suppressClick.current && event.detail) {
-            event.preventDefault();
-            event.stopPropagation();
-            suppressClick.current = false;
-          }
-        }}
-      >
-        {templates.map((template) => (
-          <li className="home-slide" key={template.templateId}>
-            <TemplateFeature template={template} />
-          </li>
-        ))}
-      </ul>
+      <div className="home-carousel-footer">
+        <div className="home-carousel-caption" key={selected.templateId}>
+          <h3>{selected.name}</h3>
+          <a
+            href={selected.demoUrl}
+            aria-label={`Preview Experience: ${selected.name}`}
+            className="home-button home-carousel-preview"
+          >
+            Preview Experience
+          </a>
+        </div>
+        <span className="home-carousel-count" aria-hidden="true">
+          {active + 1} / {count}
+        </span>
+        <span className="sr-only" aria-live="polite">
+          {selected.name}, {active + 1} of {count}. Demo available.
+        </span>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRef, useState } from "react";
 import { InvitationRenderer } from "@/invitations/renderer/InvitationRenderer";
 import type { Invitation } from "@/types/invitation";
@@ -11,12 +12,16 @@ export function PreviewShell({
   sample,
   templateId,
   trustedImageOrigin,
+  initiallyEditing = false,
+  studioAvailable = false,
 }: {
   sample: Invitation;
   templateId: string;
   trustedImageOrigin?: string;
+  initiallyEditing?: boolean;
+  studioAvailable?: boolean;
 }) {
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(initiallyEditing);
   const [personalized, setPersonalized] = useState<Invitation>();
   const sampleButton = useRef<HTMLButtonElement>(null);
 
@@ -68,6 +73,12 @@ export function PreviewShell({
                 ? "The sample stays visible until you apply your details."
                 : ""}
           </p>
+          {studioAvailable && (
+            <p className="preview-studio">
+              <Link href="/studio">Open private Studio</Link> to start a
+              separate draft. Your preview edits stay on this page.
+            </p>
+          )}
         </div>
       </section>
       <div id="invitation-preview" tabIndex={-1}>

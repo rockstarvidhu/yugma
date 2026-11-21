@@ -4,6 +4,14 @@ Date: 19 November 2026. Frontend owner: Developer A. Backend/review counterpart:
 
 **Status: PROPOSED — Developer B agreement is pending.** The owner approved the proposed route direction in the implementation brief; that does not constitute Developer B's independent agreement. No backend, authentication, database or shared invitation contract is changed. Request Developer B's confirmation during review; record any agreed revisions in a versioned update before implementing backend navigation.
 
+## Day 2 implementation decision
+
+The Day 2 owner decision supersedes the roadmap’s Heirloom product name and the proposed Day 1 values below. Afterglow is the single registry ID and catalogue offering. `/demo/heirloom` remains an alias of the same watermarked sample. The homepage carousel uses two views of that invitation, and `/templates` displays one catalogue entry with sample and personalization links.
+
+The existing server checkout sets the Afterglow Test Mode amount to 89,900 INR paise. The storefront displays that same amount with a Test Mode label. Afterglow remains a demo in the database, eligible for private drafts. Test verification grants no publishing entitlement. The amount is for development and does not establish final commercial pricing. Private draft creation requires Supabase configuration and works independently of Razorpay settings.
+
+The footer links to the project’s public GitHub Issues page for general questions. Public customer policies and a dedicated support channel remain release work.
+
 ## Routes and ownership boundaries
 
 | Route                | Current state               | Day 1 use                                                                                       |

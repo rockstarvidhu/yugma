@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DemoPreview } from "@/components/preview/DemoPreview";
+import { canCreatePrivateDraft } from "@/lib/auth/service";
 
 export const metadata: Metadata = {
   title: "Afterglow demo",
@@ -8,6 +9,14 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function AfterglowDemo() {
-  return <DemoPreview />;
+export default async function AfterglowDemo({
+  searchParams,
+}: PageProps<"/demo/afterglow">) {
+  const { personalize } = await searchParams;
+  return (
+    <DemoPreview
+      initiallyEditing={personalize === "1"}
+      studioAvailable={canCreatePrivateDraft()}
+    />
+  );
 }

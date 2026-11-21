@@ -1,6 +1,6 @@
 import { invitationSchema } from "@/lib/invitation-schema";
 import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Afterglow } from "./afterglow/Afterglow";
 import { createTemplateRegistry, templateRegistry } from "./registry";
 import { shellDemoInvitation } from "./internal/demo-invitation";
@@ -9,9 +9,17 @@ import AfterglowDemo, { metadata } from "@/app/demo/afterglow/page";
 import HeirloomDemo, {
   metadata as heirloomMetadata,
 } from "@/app/demo/heirloom/page";
+import { canCreatePrivateDraft } from "@/lib/auth/service";
 import type { InvitationTemplateProps } from "./types";
 
-afterEach(cleanup);
+vi.mock("@/lib/auth/service", () => ({
+  canCreatePrivateDraft: vi.fn(() => false),
+}));
+
+afterEach(() => {
+  cleanup();
+  vi.resetAllMocks();
+});
 
 describe("template registry and renderer", () => {
   it("looks up the stable Afterglow ID", () => {
@@ -142,8 +150,13 @@ describe("template registry and renderer", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText("Celebrate with us")).not.toBeInTheDocument();
   });
-  it("shows a demo watermark and fictional invitation on the route", () => {
-    render(<AfterglowDemo />);
+  it("shows a demo watermark and fictional invitation on the route", async () => {
+    render(
+      await AfterglowDemo({
+        searchParams: Promise.resolve({}),
+        params: Promise.resolve({}),
+      }),
+    );
     expect(
       screen.getByRole("complementary", { name: "Demo preview" }),
     ).toHaveTextContent("YUGMA • DEMO");
@@ -197,6 +210,25 @@ describe("template registry and renderer", () => {
       screen.getAllByRole("link", { name: /Get Directions/i }),
     ).toHaveLength(1);
     expect(metadata.robots).toEqual({ index: false, follow: false });
+  });
+  it("opens the watermarked editor from the catalogue link and offers Studio when configured", async () => {
+    vi.mocked(canCreatePrivateDraft).mockReturnValue(true);
+
+    render(
+      await AfterglowDemo({
+        searchParams: Promise.resolve({ personalize: "1" }),
+        params: Promise.resolve({}),
+      }),
+    );
+    expect(
+      screen.getByRole("form", { name: "Your invitation details" }),
+    ).toHaveAttribute("id", "preview-editor");
+    expect(
+      screen.getByRole("complementary", { name: "Demo preview" }),
+    ).toHaveTextContent("YUGMA • DEMO");
+    expect(
+      screen.getByRole("link", { name: "Open private Studio" }),
+    ).toHaveAttribute("href", "/studio");
   });
   it("serves the default sample at /demo/heirloom with a non-dismissible watermark", () => {
     const { container } = render(<HeirloomDemo />);
