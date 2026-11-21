@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { DemoPreview } from "@/components/preview/DemoPreview";
+import { getSupabaseConfig } from "@/lib/auth/client";
+import { canStartAfterglowTestDraft } from "@/lib/checkout/gateway";
 
 export const metadata: Metadata = {
   title: "Afterglow demo",
@@ -8,6 +10,16 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function AfterglowDemo() {
-  return <DemoPreview />;
+export default async function AfterglowDemo({
+  searchParams,
+}: PageProps<"/demo/afterglow">) {
+  const { personalize } = await searchParams;
+  return (
+    <DemoPreview
+      initiallyEditing={personalize === "1"}
+      studioAvailable={
+        getSupabaseConfig() !== null && canStartAfterglowTestDraft()
+      }
+    />
+  );
 }

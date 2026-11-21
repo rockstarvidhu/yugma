@@ -46,7 +46,7 @@ export function StorefrontHeader() {
           <BrandLogo decorative tone="forest" className="home-mark-dark" />
         </Link>
         <nav className="home-desktop-nav" aria-label="Main navigation">
-          {storefrontNavigation.slice(1, 3).map(({ label, href }) => (
+          {storefrontNavigation.slice(1).map(({ label, href }) => (
             <a href={href} key={href}>
               {label}
             </a>
@@ -73,7 +73,7 @@ export function StorefrontHeader() {
         aria-label="Mobile navigation"
         hidden={!open}
       >
-        {storefrontNavigation.slice(0, 3).map(({ label, href }) => (
+        {storefrontNavigation.map(({ label, href }) => (
           <a href={href} key={href} onClick={() => setOpen(false)}>
             {label}
           </a>

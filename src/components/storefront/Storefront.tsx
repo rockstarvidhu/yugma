@@ -23,6 +23,10 @@ const steps = [
     title: "Preview the invitation",
     text: "See what guests would see in the watermarked demo.",
   },
+  {
+    title: "Buy and publish",
+    text: "Checkout is in Test Mode. Live purchases and publishing are coming later.",
+  },
 ] as const;
 
 export function Storefront({
@@ -42,6 +46,12 @@ export function Storefront({
           <div className="home-shell">
             <header className="home-collection-head">
               <h2 id="collection-heading">The YUGMA Collection</h2>
+              <Link
+                className="home-text-link"
+                href={storefrontRoutes.catalogue}
+              >
+                View catalogue
+              </Link>
             </header>
             <TemplateCarousel collection={collection} />
           </div>
@@ -67,12 +77,12 @@ export function Storefront({
         <section className="home-final" aria-labelledby="closing-heading">
           <BrandLogo decorative tone="sand" variant="emblem" />
           <h2 id="closing-heading">Give your story a beginning.</h2>
-          <a
+          <Link
             className="home-button home-button-light"
-            href={storefrontRoutes.collection}
+            href={storefrontRoutes.catalogue}
           >
             Explore Templates
-          </a>
+          </Link>
         </section>
       </main>
       <footer className="home-footer" id="contact" tabIndex={-1}>
@@ -87,6 +97,10 @@ export function Storefront({
           </nav>
           <p>© YUGMA</p>
         </div>
+        <p className="home-shell home-footer-note">
+          Customer support, terms, privacy and refund policies will be available
+          before launch.
+        </p>
       </footer>
     </StorefrontExperience>
   );

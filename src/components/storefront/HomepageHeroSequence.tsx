@@ -54,9 +54,7 @@ export function HomepageHeroSequence({
             Some moments <br />
             deserve <em>more.</em>
           </h1>
-          <p>
-            Beautifully crafted digital invitations, made to tell your story.
-          </p>
+          <p>Digital wedding invitations for the story only you can tell.</p>
           <a
             className="home-button home-button-light"
             href={storefrontRoutes.collection}

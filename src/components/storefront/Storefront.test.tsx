@@ -45,70 +45,70 @@ describe("YUGMA homepage scroll and collection", () => {
       const url = new URL(link.href, "http://localhost");
       if (url.hash && url.pathname === "/")
         expect(container.querySelector(url.hash)).not.toBeNull();
-      expect(["/", "/demo/heirloom", "/demo/afterglow"]).toContain(
-        url.pathname,
-      );
+      expect([
+        "/",
+        "/templates",
+        "/demo/heirloom",
+        "/demo/afterglow",
+      ]).toContain(url.pathname);
     }
   });
 
-  it("features Afterglow as one product with a single demo action", () => {
+  it("features Afterglow centered between four upcoming designs", () => {
     render(<Storefront />);
     const gallery = within(
       screen.getByRole("region", { name: "The YUGMA Collection" }),
     );
     expect(gallery.getByRole("heading", { name: "Afterglow" })).toBeVisible();
-    expect(gallery.getAllByRole("img")).toHaveLength(1);
-    expect(gallery.getAllByRole("link")).toHaveLength(1);
+    const track = within(
+      gallery.getByRole("list", { name: "Invitation templates" }),
+    );
+    const slides = track.getAllByRole("listitem");
+    expect(slides.map((slide) => slide.dataset.position)).toEqual([
+      "0",
+      "1",
+      "2",
+      "-2",
+      "-1",
+    ]);
+    expect(gallery.getAllByRole("img")).toHaveLength(5);
+    expect(
+      gallery.getByRole("link", { name: "View catalogue" }),
+    ).toHaveAttribute("href", "/templates");
+    expect(gallery.getAllByRole("link")).toHaveLength(2);
     expect(
       gallery.getByRole("link", { name: "Preview Experience: Afterglow" }),
     ).toHaveAttribute("href", "/demo/afterglow");
-    expect(gallery.queryByRole("button")).not.toBeInTheDocument();
-    expect(gallery.queryByRole("list")).not.toBeInTheDocument();
+    expect(
+      gallery.getByRole("button", { name: "Next template" }),
+    ).toBeVisible();
     expect(getStorefrontCollection({ get: () => undefined })).toEqual([]);
   });
 
-  it("provides navigation only for multiple templates and labels unpublished fixtures", () => {
-    const [afterglow] = getStorefrontCollection();
-    render(
-      <TemplateCarousel
-        collection={[
-          afterglow,
-          {
-            ...afterglow,
-            templateId: "test-design",
-            name: "Design for testing",
-            availability: "in-development",
-          },
-        ]}
-      />,
-    );
+  it("rotates with arrows or keyboard and lets visitors select a side card", () => {
+    render(<TemplateCarousel collection={getStorefrontCollection()} />);
     const track = screen.getByRole("list", { name: "Invitation templates" });
-    const slides = within(track).getAllByRole("listitem");
-    expect(slides).toHaveLength(2);
-    expect(within(slides[1]).getByText("In development")).toBeVisible();
-    expect(within(slides[1]).queryByRole("link")).not.toBeInTheDocument();
-    const scrollTo = vi.fn();
-    Object.defineProperties(track, {
-      scrollTo: { value: scrollTo },
-      scrollWidth: { value: 550 },
-      clientWidth: { value: 300 },
-    });
-    Object.defineProperty(slides[1], "offsetLeft", { value: 275 });
-    expect(
-      screen.getByRole("button", { name: "Previous template" }),
-    ).toHaveAttribute("aria-disabled", "true");
     fireEvent.click(screen.getByRole("button", { name: "Next template" }));
-    expect(scrollTo).toHaveBeenLastCalledWith({
-      left: 250,
-      behavior: "smooth",
-    });
-    fireEvent.keyDown(track, { key: "Home" });
-    expect(scrollTo).toHaveBeenLastCalledWith({ left: 0, behavior: "smooth" });
-    fireEvent.keyDown(track, { key: "End" });
-    expect(scrollTo).toHaveBeenLastCalledWith({
-      left: 250,
-      behavior: "smooth",
-    });
+    expect(screen.getByRole("heading", { name: "Jasmine Hour" })).toBeVisible();
+    expect(screen.getByText("Coming soon")).toBeVisible();
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    fireEvent.keyDown(track, { key: "ArrowLeft" });
+    expect(screen.getByRole("heading", { name: "Afterglow" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Previous template" }));
+    expect(
+      screen.getByRole("heading", { name: "Letters at Dusk" }),
+    ).toBeVisible();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Select Moonlit Vows" }),
+    );
+    expect(screen.getByRole("heading", { name: "Moonlit Vows" })).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Select Moonlit Vows" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    const sound = screen.getByRole("button", { name: "Carousel sound" });
+    expect(sound).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(sound);
+    expect(sound).toHaveAttribute("aria-pressed", "false");
   });
 
   it("moves focus to the collection when skipping the intro", () => {

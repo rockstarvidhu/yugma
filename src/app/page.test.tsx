@@ -1,7 +1,8 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import Home, { metadata } from "./page";
 import BrandPreview from "./dev/brand/page";
+import TemplatesPage, { metadata as catalogueMetadata } from "./templates/page";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { Button } from "@/components/ui/Button";
 
@@ -38,7 +39,7 @@ describe("YUGMA brand foundations", () => {
     ).toHaveAttribute("src", "/brand/yugma-wordmark-forest.svg");
     expect(
       screen.getByText(
-        "Beautifully crafted digital invitations, made to tell your story.",
+        "Digital wedding invitations for the story only you can tell.",
       ),
     ).toBeInTheDocument();
     expect(metadata.openGraph).toMatchObject({
@@ -57,6 +58,34 @@ describe("YUGMA brand foundations", () => {
       "src",
       "/brand/yugma-emblem-sand.svg",
     );
+  });
+  it("lists the registered design with separate sample and personalization links", () => {
+    render(<TemplatesPage />);
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Wedding invitation templates",
+      }),
+    ).toBeVisible();
+    const cards = screen.getAllByRole("article");
+    expect(cards).toHaveLength(5);
+    const upcoming = within(cards[1]);
+    expect(
+      upcoming.getByRole("heading", { name: "Jasmine Hour" }),
+    ).toBeVisible();
+    expect(screen.getAllByText("Coming soon")).toHaveLength(4);
+    expect(upcoming.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.getByText("₹899 one-time")).toBeVisible();
+    expect(screen.getByText("in Test Mode")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Try Demo" })).toHaveAttribute(
+      "href",
+      "/demo/afterglow",
+    );
+    expect(screen.getByRole("link", { name: "Personalize" })).toHaveAttribute(
+      "href",
+      "/demo/afterglow?personalize=1#preview-editor",
+    );
+    expect(catalogueMetadata.alternates?.canonical).toBe("/templates");
   });
   it("excludes decorative logos from the accessible image list", () => {
     const { container } = render(<BrandLogo decorative />);

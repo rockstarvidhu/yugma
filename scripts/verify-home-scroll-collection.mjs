@@ -361,19 +361,32 @@ async function checkHomepage() {
     const action = gallery.getByRole("link", {
       name: "Preview Experience: Afterglow",
     });
-    assert.equal(await gallery.getByRole("link").count(), 1);
-    assert.equal(await gallery.getByRole("button").count(), 0);
-    assert.equal(await gallery.getByRole("list").count(), 0);
+    assert.equal(await gallery.getByRole("link").count(), 2);
+    assert.equal(
+      await gallery
+        .getByRole("link", { name: "View catalogue" })
+        .getAttribute("href"),
+      "/templates",
+    );
+    const track = gallery.getByRole("list", { name: "Invitation templates" });
+    assert.equal(await track.getByRole("listitem").count(), 5);
+    const nextTemplate = gallery.getByRole("button", { name: "Next template" });
+    await nextTemplate.click();
+    await gallery.getByRole("heading", { name: "Jasmine Hour" }).waitFor();
+    assert(await gallery.getByText("Coming soon", { exact: true }).isVisible());
+    await gallery.getByRole("button", { name: "Previous template" }).click();
     assert.equal(
       await gallery.getByRole("heading", { name: "Afterglow" }).count(),
       1,
     );
     assert.equal(await action.getAttribute("href"), "/demo/afterglow");
-    const art = gallery.locator(".home-featured-art");
+    const art = gallery.locator(
+      '[data-template-id="afterglow"] .home-featured-art',
+    );
     await art.locator("img").evaluate((img) => img.decode());
     const portrait = await art.boundingBox();
     assert(portrait.height / portrait.width > 1.35);
-    if (mobile) assert(portrait.width >= width * 0.85);
+    assert.equal(await track.locator('[data-position="0"]').count(), 1);
     if (width === 390 || width === 1440) {
       await shot(
         page,
@@ -541,7 +554,9 @@ async function checkHomepage() {
     await page
       .locator(".home-moment-photo")
       .evaluate((image) => image.decode());
-    const art = page.locator(".home-featured-art img");
+    const art = page.locator(
+      '[data-template-id="afterglow"] .home-featured-art img',
+    );
     await art.scrollIntoViewIfNeeded();
     await art.evaluate((image) => image.decode());
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
