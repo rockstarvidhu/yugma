@@ -123,12 +123,16 @@ const draftEventSchema = weddingEventSchema
   .required({ id: true })
   .strict();
 
+const draftImageSchema = invitationImageSchema
+  .extend({ focalPosition: focalPositionSchema.strict().optional() })
+  .strict();
+
 export const invitationDraftSchema = z
   .strictObject({
     ...invitationSchema.shape,
     couple: coupleSchema.partial().strict(),
-    coverImage: invitationImageSchema.strict(),
-    gallery: z.array(invitationImageSchema.strict()).max(MAX_GALLERY_IMAGES),
+    coverImage: draftImageSchema,
+    gallery: z.array(draftImageSchema).max(MAX_GALLERY_IMAGES),
     events: z.array(draftEventSchema).max(MAX_EVENTS),
   })
   .partial()

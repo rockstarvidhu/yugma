@@ -1,6 +1,10 @@
 import "server-only";
 import { z } from "zod";
-import { getServerAuth } from "@/lib/auth/server";
+import { getVerifiedSession } from "@/lib/auth/server";
+import {
+  invitationDraftSchema,
+  type InvitationDraft,
+} from "@/lib/invitation-schema";
 import { templateRegistry } from "@/templates/registry";
 import {
   MAX_DRAFT_BYTES,
@@ -51,6 +55,7 @@ function invalidTextPath(value: unknown, path: string): string | undefined {
 async function requestBody<T extends { data: unknown }>(
   request: Request,
   schema: z.ZodType<T>,
+  invalidStatus: 400 | 422,
 ) {
   if (Number(request.headers.get("content-length")) > MAX_REQUEST_BYTES)
     return { response: failure(413, sizeError) };
@@ -60,7 +65,7 @@ async function requestBody<T extends { data: unknown }>(
     .trim()
     .toLowerCase();
   if (mediaType !== "application/json" || !request.body)
-    return { response: failure(422, invalidJson) };
+    return { response: failure(invalidStatus, invalidJson) };
 
   const reader = request.body.getReader();
   const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -83,12 +88,11 @@ async function requestBody<T extends { data: unknown }>(
       value !== null &&
       typeof value === "object" &&
       "data" in value &&
-      new TextEncoder().encode(JSON.stringify(value.data)).byteLength >
-        MAX_DRAFT_BYTES
+      exceedsDraftLimit(value.data)
     )
       return { response: failure(413, sizeError) };
   } catch {
-    return { response: failure(422, invalidJson) };
+    return { response: failure(invalidStatus, invalidJson) };
   } finally {
     reader.releaseLock();
   }
@@ -96,21 +100,14 @@ async function requestBody<T extends { data: unknown }>(
   const result = schema.safeParse(value);
   if (!result.success) {
     return {
-      response: failure(422, {
-        code: "INVALID_DRAFT",
-        message: "Correct the draft fields and try again.",
-        issues: result.error.issues.slice(0, 20).map(({ path, message }) => ({
-          path: path.map(String).join("."),
-          message,
-        })),
-      }),
+      response: invalidFields(invalidStatus, result.error.issues),
     };
   }
 
   const path = invalidTextPath(result.data.data, "data");
   if (path) {
     return {
-      response: failure(422, {
+      response: failure(invalidStatus, {
         code: "INVALID_DRAFT",
         message: "Correct the draft fields and try again.",
         issues: [
@@ -123,22 +120,64 @@ async function requestBody<T extends { data: unknown }>(
   return { data: result.data };
 }
 
+function exceedsDraftLimit(data: unknown) {
+  return (
+    new TextEncoder().encode(JSON.stringify(data)).byteLength > MAX_DRAFT_BYTES
+  );
+}
+
+function invalidFields(
+  status: 400 | 422,
+  issues: z.ZodError["issues"],
+  prefix: string[] = [],
+) {
+  return failure(status, {
+    code: "INVALID_DRAFT",
+    message: "Correct the draft fields and try again.",
+    issues: issues.slice(0, 20).map(({ path, message }) => ({
+      path: [...prefix, ...path.map(String)].join("."),
+      message,
+    })),
+  });
+}
+
+function mergeDraft(
+  current: InvitationDraft,
+  changes: InvitationDraft,
+): InvitationDraft {
+  const merged = { ...current, ...changes };
+  if (changes.couple) merged.couple = { ...current.couple, ...changes.couple };
+  if (changes.events?.length) {
+    const events = new Map(current.events?.map((event) => [event.id, event]));
+    for (const change of changes.events) {
+      const event = events.get(change.id);
+      events.set(change.id, {
+        ...event,
+        ...change,
+        ...(change.venue && { venue: { ...event?.venue, ...change.venue } }),
+      });
+    }
+    merged.events = [...events.values()];
+  }
+  return merged;
+}
+
+function versionConflict(version: number) {
+  return failure(409, {
+    code: "VERSION_CONFLICT",
+    message: "The draft version has changed. Reload it before saving again.",
+    currentVersion: version,
+  });
+}
+
 async function withDraftSession(
-  operation: (session: {
-    client: NonNullable<Awaited<ReturnType<typeof getServerAuth>>>;
-    ownerId: string;
-  }) => Promise<Response>,
+  operation: (
+    session: NonNullable<Awaited<ReturnType<typeof getVerifiedSession>>>,
+  ) => Promise<Response>,
 ) {
   try {
-    const client = await getServerAuth({ writeCookies: true });
-    if (client) {
-      // Verify the current session with Auth before using the server write key.
-      const { data, error } = await client.auth.getUser();
-      const user = data?.user;
-      if (!error && user?.role === "authenticated" && !user.is_anonymous)
-        return await operation({ client, ownerId: user.id });
-      if (error?.status && error.status >= 500) throw error;
-    }
+    const session = await getVerifiedSession();
+    if (session) return await operation(session);
     return failure(401, {
       code: "UNAUTHENTICATED",
       message: "Sign in to access your drafts.",
@@ -169,7 +208,7 @@ export function listDrafts(request: Request) {
 
 export function createDraft(request: Request) {
   return withDraftSession(async ({ ownerId }) => {
-    const result = await requestBody(request, createDraftSchema);
+    const result = await requestBody(request, createDraftSchema, 422);
     if (result.response) return result.response;
     const { templateKey, data } = result.data;
     const draft = templateRegistry.get(templateKey)
@@ -200,28 +239,38 @@ export function loadDraft(id: string) {
   });
 }
 
-export function saveDraft(request: Request, id: string) {
+export function saveDraft(
+  request: Request,
+  id: string,
+  mode: "merge" | "replace" = "merge",
+) {
   return withDraftSession(async (session) => {
     if (!draftIdSchema.safeParse(id).success) return notFound();
-    const result = await requestBody(request, saveDraftSchema);
+    const result = await requestBody(request, saveDraftSchema, 400);
     if (result.response) return result.response;
     const { data, expectedVersion } = result.data;
+    const current = await store.loadDraft(session, id);
+    if (!current) return notFound();
+    if (current.version !== expectedVersion)
+      return versionConflict(current.version);
+
+    const next = invitationDraftSchema.safeParse(
+      mode === "merge" ? mergeDraft(current.data, data) : data,
+    );
+    if (!next.success) return invalidFields(400, next.error.issues, ["data"]);
+    if (exceedsDraftLimit(next.data)) return failure(413, sizeError);
+
     const draft = await store.saveDraft(
       session.ownerId,
       id,
       expectedVersion,
-      data,
+      next.data,
     );
     if (draft)
       return Response.json({ draft } satisfies DraftResponse, { headers });
 
-    // Distinguish a stale save only after the RLS-protected owner read succeeds.
-    const current = await store.loadDraft(session, id);
-    if (!current) return notFound();
-    return failure(409, {
-      code: "VERSION_CONFLICT",
-      message: "The draft version has changed. Reload it before saving again.",
-      currentVersion: current.version,
-    });
+    // Re-read under the caller's session after a write loses the database race.
+    const latest = await store.loadDraft(session, id);
+    return latest ? versionConflict(latest.version) : notFound();
   });
 }

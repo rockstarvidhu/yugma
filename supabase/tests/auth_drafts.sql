@@ -24,8 +24,8 @@ begin
     raise exception 'Authenticated role could insert a draft directly';
   exception when insufficient_privilege then null;
   end;
-  if has_column_privilege('public.invitations', 'data', 'UPDATE')
-    or has_column_privilege('public.invitations', 'owner_id', 'INSERT')
+  if has_any_column_privilege('public.invitations', 'UPDATE')
+    or has_any_column_privilege('public.invitations', 'INSERT')
     or has_table_privilege('public.invitations', 'DELETE')
     or has_function_privilege('public.create_private_draft(uuid,text,jsonb)', 'EXECUTE')
     or has_function_privilege('public.save_private_draft(uuid,uuid,integer,jsonb)', 'EXECUTE')
@@ -88,6 +88,14 @@ begin
   begin
     update public.invitations set status = 'paid' where id = draft_id;
     raise exception 'Owner was able to mark their draft paid';
+  exception when insufficient_privilege then null;
+  end;
+
+  begin
+    update public.invitations
+      set status = 'published', share_slug = 'owner-write', published_at = now()
+      where id = draft_id;
+    raise exception 'Owner was able to publish their draft';
   exception when insufficient_privilege then null;
   end;
 
@@ -286,7 +294,8 @@ declare
 begin
   select to_jsonb(i) into strict invitation
   from public.get_published_invitation('fictional-celebration') as i;
-  if invitation ?| array['id', 'owner_id', 'object_key', 'gateway_order_id']
+  if (select array_agg(key order by key) from jsonb_object_keys(invitation) as keys(key))
+      is distinct from array['data', 'published_at', 'registry_key', 'schema_version', 'share_slug']
     or invitation->>'registry_key' <> 'afterglow' or invitation->>'schema_version' <> '1'
   then
     raise exception 'Published lookup returned the wrong projection';
