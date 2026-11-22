@@ -275,6 +275,7 @@ describe("optional media", () => {
   it.each([
     "javascript:alert(1)",
     "data:image/png;base64,abc",
+    "blob:https://yugma.test/a-photo",
     "file:///tmp/a.png",
     "ftp://example.com/a.jpg",
     "not a URL",

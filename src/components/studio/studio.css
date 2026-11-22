@@ -100,6 +100,34 @@
 .studio-form legend {
   padding-inline: 0.35rem;
 }
+.studio-cover-window.heirloom-cover {
+  min-height: 0;
+  aspect-ratio: 4 / 3;
+  padding: 0;
+  align-self: start;
+}
+.studio-field input[type="file"],
+.studio-field input[type="range"] {
+  accent-color: var(--yugma-forest);
+}
+.studio-field input[type="file"] {
+  /* The input resets so the same file can be picked again. Show selection in the preview. */
+  font-size: 0;
+}
+.studio-field input[type="file"]::file-selector-button {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+.studio-field input[type="range"] {
+  background: transparent;
+  border: 0;
+  padding-inline: 0.15rem;
+}
 .studio-error {
   color: #842940;
   overflow-wrap: anywhere;

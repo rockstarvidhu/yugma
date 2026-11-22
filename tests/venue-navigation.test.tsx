@@ -45,6 +45,7 @@ describe("VenueCard", () => {
     expect(screen.getByText(venue.name)).toBeVisible();
     expect(screen.getByText(venue.address)).toBeVisible();
     expect(screen.queryByRole("link")).toBeNull();
+    expect(screen.queryByText("Get Directions")).toBeNull();
   });
 
   it("renders canonical maximum-length venue names and addresses", () => {

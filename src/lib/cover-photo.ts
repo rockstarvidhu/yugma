@@ -1,5 +1,10 @@
 import type { InvitationImage } from "@/types/invitation";
 
+export type CoverPhotoSource = Pick<
+  InvitationImage,
+  "src" | "alt" | "focalPosition"
+>;
+
 export const demoCoverPhotoUrl =
   "https://images.unsplash.com/photo-1754782540893-2122877f2975?auto=format&fit=crop&w=2400&q=80";
 

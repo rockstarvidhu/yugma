@@ -21,7 +21,7 @@ export function VenueCard({ venue, location, eventTitle }: VenueCardProps) {
       {location && location !== name && (
         <p className="mt-0.5 text-muted">{location}</p>
       )}
-      {directions.success && (
+      {directions.success && directions.data && (
         <a
           aria-label={`Get Directions to ${destination} (opens in a new tab)`}
           href={directions.data}

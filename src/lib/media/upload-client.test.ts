@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, expect, it, vi } from "vitest";
-import { uploadPrivatePhoto } from "./upload-client";
+import { PhotoVerificationError, uploadPrivatePhoto } from "./upload-client";
 
 const assetId = "a1000000-0000-4000-8000-000000000001";
 const draftId = "a2000000-0000-4000-8000-000000000001";
@@ -110,4 +110,56 @@ it("surfaces verification failure without returning an asset ID", async () => {
   await expect(
     uploadPrivatePhoto(draftId, file, new AbortController().signal, vi.fn()),
   ).rejects.toThrow("Photo verification failed.");
+});
+
+it("requests a new upload ticket after the storage grant is rejected", async () => {
+  const fetch = prepare();
+  const signal = new AbortController().signal;
+  PutTransport.status = 403;
+  await expect(
+    uploadPrivatePhoto(draftId, file, signal, vi.fn()),
+  ).rejects.toThrow("upload link expired or was rejected");
+  expect(fetch).toHaveBeenCalledTimes(1);
+  PutTransport.status = 200;
+  fetch
+    .mockResolvedValueOnce(
+      Response.json({
+        assetId,
+        uploadUrl: "https://storage.example/new-ticket",
+      }),
+    )
+    .mockResolvedValueOnce(Response.json({ assetId }));
+  await expect(
+    uploadPrivatePhoto(draftId, file, signal, vi.fn()),
+  ).resolves.toBe(assetId);
+  expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+    `/api/drafts/${draftId}/media`,
+    `/api/drafts/${draftId}/media`,
+    `/api/drafts/${draftId}/media/${assetId}`,
+  ]);
+});
+
+it("retries interrupted verification without requesting a second grant or uploading again", async () => {
+  const fetch = prepare();
+  const signal = new AbortController().signal;
+  fetch.mockRejectedValueOnce(new Error("Fixture network interruption"));
+  const error = await uploadPrivatePhoto(draftId, file, signal, vi.fn()).catch(
+    (failure: unknown) => failure,
+  );
+  expect(error).toBeInstanceOf(PhotoVerificationError);
+  if (!(error instanceof PhotoVerificationError)) return;
+  expect(error.assetId).toBe(assetId);
+
+  PutTransport.onSend = () => {
+    throw new Error("Unexpected duplicate upload");
+  };
+  fetch.mockResolvedValueOnce(Response.json({ assetId }));
+  await expect(
+    uploadPrivatePhoto(draftId, file, signal, vi.fn(), error.assetId),
+  ).resolves.toBe(assetId);
+  expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+    `/api/drafts/${draftId}/media`,
+    `/api/drafts/${draftId}/media/${assetId}`,
+    `/api/drafts/${draftId}/media/${assetId}`,
+  ]);
 });

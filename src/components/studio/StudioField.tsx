@@ -7,6 +7,7 @@ export function StudioField({
   type = "text",
   multiline = false,
   hint,
+  disabled,
 }: {
   path: string;
   label: string;
@@ -16,6 +17,7 @@ export function StudioField({
   type?: "text" | "url" | "datetime-local";
   multiline?: boolean;
   hint?: string;
+  disabled?: boolean;
 }) {
   const id = `studio-${path.replaceAll(".", "-")}`;
   const error = issues[path];
@@ -25,6 +27,7 @@ export function StudioField({
   const control = {
     id,
     value,
+    disabled,
     "aria-invalid": error ? true : undefined,
     "aria-describedby": describedBy,
   };
