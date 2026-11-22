@@ -68,3 +68,18 @@ jobs:
             docker exec -i "$DB_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 --single-transaction < "$migration"
           done
           docker exec -i "$DB_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/auth_drafts.sql
+      - name: Rehearse schema export and draft restore
+        env:
+          DB_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          backup_dir=$(mktemp -d)
+          docker exec -i "$DB_CONTAINER" psql -XqAt -U postgres -v ON_ERROR_STOP=1 -v seed_backup_fixture=1 < supabase/tests/draft_backup.sql > "$backup_dir/source.fingerprint"
+          grep -Exq '[0-9a-f]{32}' "$backup_dir/source.fingerprint"
+          docker exec "$DB_CONTAINER" pg_dump -U postgres --schema-only > "$backup_dir/schema.sql"
+          test -s "$backup_dir/schema.sql"
+          docker exec "$DB_CONTAINER" pg_dump -U postgres --format=custom > "$backup_dir/drafts.backup"
+          docker exec "$DB_CONTAINER" createdb -U postgres --template=template0 yugma_restore
+          docker exec -i "$DB_CONTAINER" pg_restore -U postgres --exit-on-error --single-transaction --dbname=yugma_restore < "$backup_dir/drafts.backup"
+          docker exec -i "$DB_CONTAINER" psql -XqAt -U postgres -d yugma_restore -v ON_ERROR_STOP=1 -v seed_backup_fixture=0 < supabase/tests/draft_backup.sql > "$backup_dir/restored.fingerprint"
+          diff -u "$backup_dir/source.fingerprint" "$backup_dir/restored.fingerprint"
+          docker exec -i "$DB_CONTAINER" psql -U postgres -d yugma_restore -v ON_ERROR_STOP=1 < supabase/tests/auth_drafts.sql
