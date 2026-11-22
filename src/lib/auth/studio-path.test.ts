@@ -7,12 +7,16 @@ describe("studio sign-in return path", () => {
   it("preserves the studio and its draft route", () => {
     expect(studioReturnPath("/studio")).toBe("/studio");
     expect(studioReturnPath(draft)).toBe(draft);
+    expect(studioReturnPath("/create/afterglow")).toBe("/create/afterglow");
   });
 
   it.each([
     "https://example.com/studio",
     "//example.com/studio",
     "/studio/../checkout",
+    "/create/../checkout",
+    "/create/afterglow?next=https://example.com",
+    "/create/%2f%2fexample.com",
     "/studio/%2e%2e/checkout",
     "/studio\\example.com",
     `${draft}?next=https://example.com`,
