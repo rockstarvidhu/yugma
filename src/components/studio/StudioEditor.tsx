@@ -132,13 +132,13 @@ export function StudioEditor({
   );
 
   useEffect(() => {
-    if (!dirty) return;
+    if (!dirty && !photoBusy) return;
     function protect(event: BeforeUnloadEvent) {
       event.preventDefault();
     }
     window.addEventListener("beforeunload", protect);
     return () => window.removeEventListener("beforeunload", protect);
-  }, [dirty]);
+  }, [dirty, photoBusy]);
 
   useEffect(() => {
     if (problem) errorRef.current?.focus();

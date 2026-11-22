@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   render,
   screen,
@@ -8,7 +9,27 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Draft } from "@/lib/drafts/contract";
+import {
+  draftMediaPath,
+  MAX_PHOTO_BYTES,
+  privatePhotoReference,
+} from "@/lib/media/contract";
+import {
+  PhotoVerificationError,
+  uploadPrivatePhoto,
+} from "@/lib/media/upload-client";
 import { StudioEditor } from "./StudioEditor";
+
+vi.mock("@/lib/media/upload-client", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/media/upload-client")>()),
+  uploadPrivatePhoto: vi.fn(),
+}));
+
+const upload = vi.mocked(uploadPrivatePhoto);
+const originalAsset = "a1000000-0000-4000-8000-000000000001";
+const replacementAsset = "a1000000-0000-4000-8000-000000000002";
+const privateMediaSource = (id: string) =>
+  new URL(draftMediaPath(fixture.id, id), window.location.origin).href;
 
 const fixture: Draft = {
   id: "e1000000-0000-4000-8000-000000000001",
@@ -41,13 +62,242 @@ const failure = (status: number) =>
 const button = (name: string) => screen.getByRole("button", { name });
 const nameField = () => screen.getByLabelText("Partner 1 name");
 
-function edit(draft = fixture) {
-  render(<StudioEditor initialDraft={draft} templateName="Afterglow" />);
+function edit(draft = fixture, mediaAvailable = false) {
+  render(
+    <StudioEditor
+      initialDraft={draft}
+      templateName="Afterglow"
+      mediaAvailable={mediaAvailable}
+    />,
+  );
+}
+
+function mockLocalPhotos(decode = vi.fn().mockResolvedValue(undefined)) {
+  let counter = 0;
+  const createObjectURL = vi.fn(
+    () => `blob:http://localhost/photo-${++counter}`,
+  );
+  const revokeObjectURL = vi.fn();
+  vi.stubGlobal(
+    "URL",
+    class extends URL {
+      static createObjectURL = createObjectURL;
+      static revokeObjectURL = revokeObjectURL;
+    },
+  );
+  vi.stubGlobal(
+    "Image",
+    class {
+      decode = decode;
+      naturalWidth = 640;
+      naturalHeight = 480;
+    },
+  );
+  return { createObjectURL, revokeObjectURL };
+}
+
+function pngFile(signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) {
+  const bytes = Uint8Array.from(signature);
+  const file = new File([bytes], "private-name.png", { type: "image/png" });
+  // JSDOM's Blob does not implement arrayBuffer.
+  vi.spyOn(file, "slice").mockReturnValue({
+    arrayBuffer: () => Promise.resolve(bytes.buffer),
+  } as Blob);
+  return file;
+}
+
+function chooseCover(file: File) {
+  fireEvent.change(screen.getByLabelText(/(?:choose|replace) cover photo/i), {
+    target: { files: [file] },
+  });
 }
 
 afterEach(() => {
   cleanup();
+  upload.mockReset();
   vi.unstubAllGlobals();
+});
+
+describe("Studio private cover photo", () => {
+  it("reuses the verified asset after a save failure and restores its description and crop after reload", async () => {
+    const { revokeObjectURL } = mockLocalPhotos();
+    upload.mockResolvedValue(originalAsset);
+    let saved = fixture;
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce(failure(500))
+      .mockImplementation((_url, init) => {
+        saved = {
+          ...saved,
+          version: saved.version + 1,
+          data: JSON.parse(init.body).data,
+        };
+        return Promise.resolve(response(saved));
+      });
+    vi.stubGlobal("fetch", request);
+    edit(fixture, true);
+    expect(screen.getByText("No cover photo")).toBeVisible();
+    chooseCover(pngFile());
+    const image = await screen.findByAltText("Wedding cover photograph");
+    expect(image).toHaveAttribute("src", privateMediaSource(originalAsset));
+    expect(image).not.toHaveAttribute("srcset");
+    fireEvent.load(image);
+    await waitFor(() => expect(image).toBeVisible());
+    fireEvent.change(screen.getByLabelText("Photo description"), {
+      target: { value: "Tara and Neel in a garden" },
+    });
+    fireEvent.change(screen.getByLabelText("Horizontal crop position"), {
+      target: { value: "25" },
+    });
+    fireEvent.change(screen.getByLabelText("Vertical crop position"), {
+      target: { value: "75" },
+    });
+    expect(image).toHaveStyle({ objectPosition: "25% 75%" });
+    fireEvent.click(button("Preview invitation"));
+    expect(screen.getByAltText("Tara and Neel in a garden")).toHaveStyle({
+      objectPosition: "25% 75%",
+    });
+    expect(
+      screen.getByRole("complementary", { name: "Demo preview" }),
+    ).toBeInTheDocument();
+    fireEvent.click(button("Back to editor"));
+    expect(button("Preview invitation")).toHaveFocus();
+    fireEvent.click(button("Save draft"));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "couldn’t confirm the save",
+    );
+    expect(screen.getByLabelText("Horizontal crop position")).toHaveValue("25");
+    fireEvent.click(button("Save draft"));
+    expect(await screen.findByText("Draft saved.")).toBeVisible();
+    for (const [, init] of request.mock.calls) {
+      const { data } = JSON.parse(init.body);
+      expect(data.coverImage).toEqual({
+        src: privatePhotoReference(originalAsset),
+        alt: "Tara and Neel in a garden",
+        focalPosition: { x: 0.25, y: 0.75 },
+      });
+      expect(init.body).not.toMatch(/blob:|private-name|X-Amz-/);
+    }
+    expect(upload).toHaveBeenCalledTimes(1);
+    cleanup();
+    edit(saved, true);
+    expect(screen.getByLabelText("Horizontal crop position")).toHaveValue("25");
+    expect(screen.getByAltText("Tara and Neel in a garden")).toHaveStyle({
+      objectPosition: "25% 75%",
+    });
+    fireEvent.click(button("Center photo"));
+    expect(screen.getByAltText("Tara and Neel in a garden")).toHaveStyle({
+      objectPosition: "50% 50%",
+    });
+    fireEvent.click(button("Remove cover photo"));
+    expect(screen.getByLabelText("Choose cover photo")).toHaveFocus();
+    expect(screen.getByText("No cover photo")).toBeVisible();
+    fireEvent.click(button("Save draft"));
+    expect(await screen.findByText("Draft saved.")).toBeVisible();
+    expect(saved.data).not.toHaveProperty("coverImage");
+    expect(revokeObjectURL).toHaveBeenCalledWith(
+      "blob:http://localhost/photo-1",
+    );
+  });
+
+  it("rejects invalid files before upload and retains the old cover through replacement retries", async () => {
+    const decode = vi.fn().mockResolvedValue(undefined);
+    const { createObjectURL, revokeObjectURL } = mockLocalPhotos(decode);
+    upload
+      .mockResolvedValueOnce(originalAsset)
+      .mockRejectedValueOnce(new Error("Upload failed."))
+      .mockRejectedValueOnce(
+        new PhotoVerificationError("Verification failed.", replacementAsset),
+      )
+      .mockResolvedValueOnce(replacementAsset);
+    edit(fixture, true);
+    chooseCover(new File(["document"], "photo.png", { type: "text/plain" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Choose a JPEG, PNG, or WebP image.",
+    );
+    chooseCover(
+      new File([new Uint8Array(MAX_PHOTO_BYTES + 1)], "large.png", {
+        type: "image/png",
+      }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("up to 5 MiB");
+    expect(createObjectURL).not.toHaveBeenCalled();
+    expect(upload).not.toHaveBeenCalled();
+    chooseCover(pngFile());
+    await screen.findByAltText("Wedding cover photograph");
+    chooseCover(pngFile([0x00, 0x01]));
+    expect(await screen.findByRole("alert")).toHaveTextContent("couldn’t open");
+    expect(decode).toHaveBeenCalledTimes(1);
+    decode.mockRejectedValueOnce(new Error("Invalid image data"));
+    chooseCover(pngFile());
+    expect(await screen.findByRole("alert")).toHaveTextContent("couldn’t open");
+    expect(screen.getByAltText("Wedding cover photograph")).toHaveAttribute(
+      "src",
+      privateMediaSource(originalAsset),
+    );
+    expect(upload).toHaveBeenCalledTimes(1);
+    expect(revokeObjectURL).toHaveBeenCalledWith(
+      "blob:http://localhost/photo-2",
+    );
+    const retryFile = pngFile();
+    chooseCover(retryFile);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Upload failed.",
+    );
+    expect(screen.getByAltText("Wedding cover photograph")).toHaveAttribute(
+      "src",
+      privateMediaSource(originalAsset),
+    );
+    fireEvent.click(button("Retry photo upload"));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Verification failed.",
+    );
+    fireEvent.click(button("Retry photo verification"));
+    await waitFor(() =>
+      expect(screen.getByAltText("Wedding cover photograph")).toHaveAttribute(
+        "src",
+        privateMediaSource(replacementAsset),
+      ),
+    );
+    expect(upload.mock.calls[3][1]).toBe(retryFile);
+    expect(upload.mock.calls[3][4]).toBe(replacementAsset);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("cancels a pending upload, ignores late completion, and prevents duplicate submissions", async () => {
+    const result = Promise.withResolvers<string>();
+    const { revokeObjectURL } = mockLocalPhotos();
+    upload
+      .mockReturnValueOnce(result.promise)
+      .mockResolvedValueOnce(replacementAsset);
+    edit(fixture, true);
+    chooseCover(pngFile());
+    await screen.findByRole("progressbar", {
+      name: "Cover photo upload progress",
+    });
+    expect(screen.getByAltText("Selected cover photograph")).toHaveAttribute(
+      "src",
+      "blob:http://localhost/photo-1",
+    );
+    expect(screen.getByLabelText("Choose cover photo")).toBeDisabled();
+    chooseCover(pngFile());
+    expect(upload).toHaveBeenCalledTimes(1);
+    fireEvent.click(button("Cancel upload"));
+    expect(upload.mock.calls[0][2].aborted).toBe(true);
+    await act(async () => result.resolve(originalAsset));
+    expect(await screen.findByText("Upload cancelled.")).toBeVisible();
+    expect(screen.getByText("No cover photo")).toBeVisible();
+    await waitFor(() =>
+      expect(screen.getByLabelText("Choose cover photo")).toHaveFocus(),
+    );
+    expect(revokeObjectURL).toHaveBeenCalledWith(
+      "blob:http://localhost/photo-1",
+    );
+    chooseCover(pngFile());
+    expect(
+      await screen.findByAltText("Wedding cover photograph"),
+    ).toHaveAttribute("src", privateMediaSource(replacementAsset));
+  });
 });
 
 describe("Studio draft editor", () => {

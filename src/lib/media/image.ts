@@ -1,8 +1,12 @@
 import "server-only";
 import sharp from "sharp";
-import { MAX_PHOTO_BYTES, type PhotoUploadRequest } from "./contract";
+import {
+  MAX_PHOTO_BYTES,
+  MAX_PHOTO_PIXELS,
+  matchesPhotoSignature,
+  type PhotoUploadRequest,
+} from "./contract";
 
-const MAX_DECODE_PIXELS = 20_000_000;
 const formats = {
   "image/jpeg": "jpeg",
   "image/png": "png",
@@ -10,19 +14,6 @@ const formats = {
 } as const;
 
 export class InvalidPhoto extends Error {}
-
-function signature(bytes: Buffer, type: PhotoUploadRequest["type"]) {
-  if (type === "image/jpeg")
-    return bytes.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]));
-  if (type === "image/png")
-    return bytes
-      .subarray(0, 8)
-      .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
-  return (
-    bytes.toString("ascii", 0, 4) === "RIFF" &&
-    bytes.toString("ascii", 8, 12) === "WEBP"
-  );
-}
 
 export async function readLimitedBytes(response: Response, limit: number) {
   const reader = response.body?.getReader();
@@ -50,10 +41,10 @@ export async function normalizePhoto(
   input: Buffer,
   type: PhotoUploadRequest["type"],
 ) {
-  if (!signature(input, type)) throw new InvalidPhoto();
+  if (!matchesPhotoSignature(input, type)) throw new InvalidPhoto();
   try {
     const source = sharp(input, {
-      limitInputPixels: MAX_DECODE_PIXELS,
+      limitInputPixels: MAX_PHOTO_PIXELS,
       failOn: "warning",
     });
     const info = await source.metadata();
