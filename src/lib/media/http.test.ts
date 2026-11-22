@@ -194,14 +194,14 @@ describe("private draft media HTTP", () => {
     );
   });
 
-  it("deletes a payload falsely labeled PNG and does not register it", async () => {
+  it("rejects a mislabeled PNG and keeps its staging key occupied until expiry", async () => {
     const fake = Buffer.from("<svg><script>bad</script></svg>");
     reserve(fake.length);
     m.staging.mockResolvedValue(photoResponse(fake, "image/png"));
     expect((await completeMedia(completeRequest(), draft, asset)).status).toBe(
       422,
     );
-    expect(m.deleteStaging).toHaveBeenCalledWith(draft, asset);
+    expect(m.deleteStaging).not.toHaveBeenCalled();
     expect(m.writeFinal).not.toHaveBeenCalled();
   });
 
@@ -222,6 +222,7 @@ describe("private draft media HTTP", () => {
       200,
     );
     expect(m.writeFinal).toHaveBeenCalledTimes(1);
+    expect(m.deleteStaging).not.toHaveBeenCalled();
     expect(m.rpc).toHaveBeenCalledExactlyOnceWith("register_draft_media", {
       p_owner: ownerId,
       p_draft: draft,

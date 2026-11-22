@@ -225,7 +225,7 @@ export function completeMedia(request: Request, draft: string, id: string) {
           if (!photo) throw new Error("Photo write failed");
         } catch (error) {
           if (!(error instanceof InvalidPhoto)) throw error;
-          await bucket.deleteStaging(draft, id).catch(() => undefined);
+          // Keep the key occupied for the lifetime of the write-once grant.
           return invalidPhoto();
         }
       }
@@ -248,7 +248,7 @@ export function completeMedia(request: Request, draft: string, id: string) {
         410,
         "This photo upload expired or the draft is unavailable.",
       );
-    await bucket.deleteStaging(draft, id).catch(() => undefined);
+    // The bucket lifecycle expires staging after the grant can no longer write.
     return complete();
   });
 }
