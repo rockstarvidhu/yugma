@@ -59,11 +59,13 @@ const hour = 3_600_000;
 function resolveStart(
   date: string,
   time: string,
-  original: string,
+  original: string | undefined,
   formatter: Intl.DateTimeFormat,
 ) {
-  const before = wallTime(formatter, Date.parse(original));
-  if (before.date === date && before.time === time) return original;
+  if (original) {
+    const before = wallTime(formatter, Date.parse(original));
+    if (before.date === date && before.time === time) return original;
+  }
 
   const requested = Date.parse(`${date}T${time}:00Z`);
   const candidates: number[] = [];
@@ -83,6 +85,40 @@ function resolveStart(
   return candidates.length
     ? new Date(Math.min(...candidates)).toISOString()
     : undefined;
+}
+
+export function localEventTime(startsAt: string, timeZone: string) {
+  const { date, time } = wallTime(
+    wallTimeFormatter(timeZone),
+    Date.parse(startsAt),
+  );
+  return `${date}T${time}`;
+}
+
+export function resolveEventStart(
+  local: string,
+  timeZone: string,
+  original?: string,
+): { startsAt: string } | { error: string } {
+  const [date, time, extra] = local.split("T");
+  if (
+    extra !== undefined ||
+    !calendarDate.safeParse(date).success ||
+    !clockTime.safeParse(time).success
+  )
+    return { error: "Enter a valid ceremony date and time." } as const;
+
+  const startsAt = resolveStart(
+    date,
+    time,
+    original,
+    wallTimeFormatter(timeZone),
+  );
+  return startsAt
+    ? ({ startsAt } as const)
+    : ({
+        error: `This time does not exist in ${timeZone}. Choose another time.`,
+      } as const);
 }
 
 export function validatePreview(original: Invitation, fields: PreviewFields) {
