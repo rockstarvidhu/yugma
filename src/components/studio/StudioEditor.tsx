@@ -33,6 +33,7 @@ import {
 import { StudioShell } from "./StudioShell";
 import { StudioField } from "./StudioField";
 import { StudioEventFields } from "./StudioEventFields";
+import { StudioPhoto } from "./StudioPhoto";
 
 type Problem = {
   message: string;
@@ -87,10 +88,12 @@ export function StudioEditor({
   initialDraft,
   templateName,
   checkout,
+  mediaAvailable = false,
 }: {
   initialDraft: Draft;
   templateName: string;
   checkout?: ReactNode;
+  mediaAvailable?: boolean;
 }) {
   const [saved, setSaved] = useState(initialDraft);
   const [draft, setDraft] = useState(initialDraft.data);
@@ -98,6 +101,7 @@ export function StudioEditor({
   const [hosts, setHosts] = useState(initialDraft.data.hosts?.join("\n") ?? "");
   const [busy, setBusy] = useState<"save" | "reload">();
   const [notice, setNotice] = useState("");
+  const [photoBusy, setPhotoBusy] = useState(false);
   const [problem, setProblem] = useState<Problem>();
   const [confirmReload, setConfirmReload] = useState(false);
   const [preview, setPreview] = useState<{
@@ -261,6 +265,7 @@ export function StudioEditor({
     event.preventDefault();
     if (
       running.current ||
+      photoBusy ||
       confirmReload ||
       problem?.status === 409 ||
       problem?.status === 404
@@ -301,7 +306,7 @@ export function StudioEditor({
   }
 
   async function reload() {
-    if (running.current) return;
+    if (running.current || photoBusy) return;
     running.current = true;
     setBusy("reload");
     const result = await getStudioDraft(saved.id);
@@ -373,6 +378,7 @@ export function StudioEditor({
         <InvitationRenderer
           templateId={saved.templateKey}
           invitation={preview.invitation}
+          privateDraftId={saved.id}
         />
       </>
     );
@@ -387,7 +393,7 @@ export function StudioEditor({
           className="studio-link"
           onNavigate={(event) => {
             if (
-              dirty &&
+              (dirty || photoBusy) &&
               !window.confirm("Leave Studio and discard your unsaved edits?")
             )
               event.preventDefault();
@@ -424,7 +430,7 @@ export function StudioEditor({
             <Button
               ref={previewButton}
               variant="secondary"
-              disabled={Boolean(busy)}
+              disabled={Boolean(busy) || photoBusy}
               onClick={showPreview}
             >
               Preview invitation
@@ -433,6 +439,7 @@ export function StudioEditor({
               type="submit"
               disabled={
                 Boolean(busy) ||
+                photoBusy ||
                 confirmReload ||
                 problem?.status === 409 ||
                 problem?.status === 404
@@ -486,7 +493,7 @@ export function StudioEditor({
                   <div className="flex flex-wrap gap-2">
                     <Button
                       variant="secondary"
-                      disabled={Boolean(busy)}
+                      disabled={Boolean(busy) || photoBusy}
                       onClick={reload}
                     >
                       Discard edits and reload
@@ -570,6 +577,15 @@ export function StudioEditor({
             }}
           />
         </fieldset>
+        <StudioPhoto
+          draftId={saved.id}
+          photo={draft.coverImage}
+          available={mediaAvailable}
+          disabled={Boolean(busy)}
+          issues={fieldErrors}
+          onChange={(coverImage) => update({ coverImage })}
+          onBusy={setPhotoBusy}
+        />
         <section className="studio-events" aria-labelledby="studio-ceremonies">
           <h2
             id="studio-ceremonies"

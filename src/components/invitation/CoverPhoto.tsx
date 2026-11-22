@@ -4,7 +4,13 @@ import Image from "next/image";
 import { useState } from "react";
 import type { InvitationImage } from "@/types/invitation";
 
-export function CoverPhoto({ photo }: { photo: InvitationImage }) {
+export function CoverPhoto({
+  photo,
+  privateAsset = false,
+}: {
+  photo: InvitationImage;
+  privateAsset?: boolean;
+}) {
   const [status, setStatus] = useState<"loading" | "loaded" | "failed">(
     "loading",
   );
@@ -19,7 +25,8 @@ export function CoverPhoto({ photo }: { photo: InvitationImage }) {
       fill
       preload
       sizes="100vw"
-      quality={85}
+      quality={privateAsset ? undefined : 85}
+      unoptimized={privateAsset}
       onLoad={() => setStatus("loaded")}
       onError={() => setStatus("failed")}
       style={{

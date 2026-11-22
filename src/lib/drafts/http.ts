@@ -174,6 +174,7 @@ async function withDraftSession(
   operation: (
     session: NonNullable<Awaited<ReturnType<typeof getVerifiedSession>>>,
   ) => Promise<Response>,
+  invalidMediaStatus: 400 | 422 = 400,
 ) {
   try {
     const session = await getVerifiedSession();
@@ -182,7 +183,26 @@ async function withDraftSession(
       code: "UNAUTHENTICATED",
       message: "Sign in to access your drafts.",
     });
-  } catch {
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error &&
+      "code" in error &&
+      error.code === "23514" &&
+      "message" in error &&
+      error.message === "Invalid private cover reference"
+    ) {
+      return failure(invalidMediaStatus, {
+        code: "INVALID_DRAFT",
+        message: "The draft photo is unavailable.",
+        issues: [
+          {
+            path: "data.coverImage.src",
+            message: "Choose a photo uploaded to this draft.",
+          },
+        ],
+      });
+    }
     return failure(500, {
       code: "INTERNAL_ERROR",
       message: "Drafts are temporarily unavailable.",
@@ -226,7 +246,7 @@ export function createDraft(request: Request) {
       status: 201,
       headers,
     });
-  });
+  }, 422);
 }
 
 export function loadDraft(id: string) {

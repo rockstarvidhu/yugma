@@ -1,0 +1,88 @@
+{
+  "browser": "157.0.8103.79",
+  "viewports": [
+    {
+      "width": 320,
+      "height": 568,
+      "touch": true,
+      "ownerRoundTrip": true,
+      "keyboard": true,
+      "noOverflow": true,
+      "demos": true,
+      "errors": [],
+      "failed": [],
+      "responses": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "touch": true,
+      "ownerRoundTrip": true,
+      "keyboard": true,
+      "noOverflow": true,
+      "demos": true,
+      "errors": [
+        "Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+      ],
+      "failed": [],
+      "responses": [503]
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "touch": true,
+      "ownerRoundTrip": true,
+      "keyboard": true,
+      "noOverflow": true,
+      "demos": true,
+      "errors": [],
+      "failed": [],
+      "responses": []
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "touch": false,
+      "ownerRoundTrip": true,
+      "keyboard": true,
+      "noOverflow": true,
+      "demos": true,
+      "errors": [],
+      "failed": [],
+      "responses": []
+    }
+  ],
+  "transport": {
+    "preflight": 5,
+    "put": 11,
+    "get": 21,
+    "delete": 7,
+    "expired": 1,
+    "sqlRls": true
+  },
+  "api": [
+    "Mobile UI surfaces failed PUT and cancellation while retaining the saved photo",
+    "Signed-out read 401",
+    "Signed-out reservation 401",
+    "Signed-out completion 401",
+    "Cross-account read 404",
+    "Cross-account reservation 404",
+    "Cross-account completion 404",
+    "Reassigned asset read 404",
+    "Cross-account attachment 400",
+    "Invalid draft ID 404",
+    "Forged key 422",
+    "Forged completion key 400",
+    "Oversized reservation 422",
+    "Unsupported format 422",
+    "Owner reservation 201",
+    "Missing object 409",
+    "Failed storage PUT 409",
+    "Concurrent completion 200/200, one registered asset",
+    "Concurrent draft save 200/409; version incremented once",
+    "Metadata-only reservation 201",
+    "Mislabeled SVG rejected on decode 422",
+    "Expired completion 410",
+    "Actual browser CORS preflights and signed upload constraints"
+  ]
+}

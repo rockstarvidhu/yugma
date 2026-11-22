@@ -1,17 +1,24 @@
 import { CoverPhoto } from "./CoverPhoto";
 import { resolveCoverPhoto } from "@/lib/cover-photo";
+import { draftMediaPath, privatePhotoId } from "@/lib/media/contract";
 import type { Invitation } from "@/types/invitation";
 
 type CoverProps = {
   invitation: Invitation;
+  privateDraftId?: string;
 };
 
-export function Cover({ invitation }: CoverProps) {
+export function Cover({ invitation, privateDraftId }: CoverProps) {
   // The schema has no primary event. Show when the celebrations begin.
   const firstStart = Math.min(
     ...invitation.events.map(({ startsAt }) => Date.parse(startsAt)),
   );
-  const coverPhoto = resolveCoverPhoto(invitation.coverImage);
+  const image = invitation.coverImage;
+  const privateAsset = privateDraftId && privatePhotoId(image?.src);
+  const coverPhoto =
+    privateAsset && image
+      ? { ...image, src: draftMediaPath(privateDraftId, privateAsset) }
+      : resolveCoverPhoto(image);
   const weddingDate = new Intl.DateTimeFormat("en-IN", {
     dateStyle: "full",
     timeZone: invitation.timeZone,
@@ -19,7 +26,13 @@ export function Cover({ invitation }: CoverProps) {
 
   return (
     <header className="heirloom-cover">
-      {coverPhoto && <CoverPhoto key={coverPhoto.src} photo={coverPhoto} />}
+      {coverPhoto && (
+        <CoverPhoto
+          key={coverPhoto.src}
+          photo={coverPhoto}
+          privateAsset={Boolean(privateAsset)}
+        />
+      )}
       <div className="heirloom-cover__veil" aria-hidden="true" />
 
       <div className="heirloom-cover__content">

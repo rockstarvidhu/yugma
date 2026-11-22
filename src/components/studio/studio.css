@@ -58,6 +58,11 @@
   gap: 0.85rem;
   min-inline-size: 0;
 }
+.studio-field input[type="file"] {
+  max-width: 100%;
+  min-width: 0;
+}
+
 .studio-field {
   gap: 0.25rem;
 }

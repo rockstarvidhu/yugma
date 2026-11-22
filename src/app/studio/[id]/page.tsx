@@ -12,6 +12,7 @@ import {
 } from "@/lib/checkout/store";
 import { draftIdSchema } from "@/lib/drafts/contract";
 import { loadDraft } from "@/lib/drafts/store";
+import { privateMediaConfigured } from "@/lib/media/storage";
 import { getStorefrontCatalogue } from "@/lib/storefront-catalogue";
 import { CheckoutButton } from "./CheckoutButton";
 
@@ -74,6 +75,7 @@ export default async function DraftStudioPage({
       key={draft.id}
       initialDraft={draft}
       templateName={templateName}
+      mediaAvailable={privateMediaConfigured() && canCreatePrivateDraft()}
       checkout={
         checkout && (
           <details className="studio-checkout">

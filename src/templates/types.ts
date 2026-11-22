@@ -4,6 +4,7 @@ import type { Invitation } from "@/types/invitation";
 export type InvitationTemplateProps = {
   invitation: Invitation;
   trustedImageOrigin?: string;
+  privateDraftId?: string;
 };
 export type TemplateDefinition = {
   readonly id: string;
