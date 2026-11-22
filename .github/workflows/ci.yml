@@ -59,7 +59,7 @@ jobs:
           --health-retries 10
     steps:
       - uses: actions/checkout@v4
-      - name: Apply migrations and verify draft and checkout authorization
+      - name: Apply migrations and verify draft, media and checkout authorization
         env:
           DB_CONTAINER: ${{ job.services.postgres.id }}
         run: |
@@ -68,6 +68,7 @@ jobs:
             docker exec -i "$DB_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 --single-transaction < "$migration"
           done
           docker exec -i "$DB_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/auth_drafts.sql
+          docker exec -i "$DB_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/private_draft_media.sql
       - name: Rehearse schema export and draft restore
         env:
           DB_CONTAINER: ${{ job.services.postgres.id }}

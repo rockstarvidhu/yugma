@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { invitationSchema } from "@/lib/invitation-schema";
+import { privatePhotoReference } from "@/lib/media/contract";
 import { Cover } from "@/components/invitation/Cover";
 import { shellDemoInvitation } from "@/templates/internal/demo-invitation";
 
@@ -44,6 +45,32 @@ describe("Cover", () => {
 
     const { container } = render(<Cover invitation={invitation} />);
     expect(container.querySelector("img")).toBeNull();
+    expect(screen.getByRole("heading", { level: 1 })).toBeVisible();
+  });
+
+  it("resolves an opaque cover reference only in Studio without the image optimizer", () => {
+    const assetId = "a1000000-0000-4000-8000-000000000001";
+    const draftId = "a2000000-0000-4000-8000-000000000001";
+    const image = {
+      src: privatePhotoReference(assetId),
+      alt: "Fictional private cover",
+    };
+    const invitation = invitationSchema.parse({
+      ...shellDemoInvitation,
+      coverImage: image,
+    });
+    const { rerender } = render(<Cover invitation={invitation} />);
+    expect(screen.queryByAltText(image.alt)).toBeNull();
+
+    rerender(<Cover invitation={invitation} privateDraftId={draftId} />);
+    const photo = screen.getByAltText(image.alt);
+    expect(
+      new URL(photo.getAttribute("src")!, "https://yugma.test").pathname,
+    ).toBe("/api/drafts/" + draftId + "/media/" + assetId);
+    expect(photo).not.toHaveAttribute("srcset");
+
+    fireEvent.error(photo);
+    expect(photo).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1 })).toBeVisible();
   });
 

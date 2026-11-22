@@ -13,6 +13,7 @@ import "./afterglow.css";
 export function Afterglow({
   invitation,
   trustedImageOrigin,
+  privateDraftId,
 }: InvitationTemplateProps) {
   const eventsByVenue = new Map<string, WeddingEvent[]>();
   for (const event of invitation.events) {
@@ -25,7 +26,7 @@ export function Afterglow({
   return (
     <main className="afterglow-invitation">
       {/* TODO(afterglow): envelope opening and cinematic reveals belong inside this template. */}
-      <Cover invitation={invitation} />
+      <Cover invitation={invitation} privateDraftId={privateDraftId} />
       <div className="afterglow-navigation">
         <QuickLinks scheduleId="celebration" venueId="venues" />
       </div>
