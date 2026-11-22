@@ -219,6 +219,114 @@ describe("Studio draft editor", () => {
     );
   });
 
+  it("preserves a valid untouched hosts list when another field changes", async () => {
+    const hosts = ["The families of Tara\nand Neel", "Asha"];
+    const request = vi.fn().mockImplementation((_url, init) =>
+      Promise.resolve(
+        response({
+          ...fixture,
+          version: 3,
+          data: JSON.parse(init.body).data,
+        }),
+      ),
+    );
+    vi.stubGlobal("fetch", request);
+    edit({ ...fixture, data: { ...fixture.data, hosts } });
+    fireEvent.change(nameField(), { target: { value: "Tara edited" } });
+    fireEvent.click(button("Save draft"));
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("Draft saved"),
+    );
+    expect(JSON.parse(request.mock.calls[0][1].body).data.hosts).toEqual(hosts);
+    fireEvent.change(screen.getByLabelText("Hosts"), { target: { value: "" } });
+    fireEvent.click(button("Save draft"));
+    await waitFor(() => expect(request).toHaveBeenCalledTimes(2));
+    expect(JSON.parse(request.mock.calls[1][1].body).data).not.toHaveProperty(
+      "hosts",
+    );
+  });
+
+  it("does not announce that all changes are saved after an unchanged draft save fails", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(failure(500)));
+    edit();
+    expect(screen.getByRole("status")).toHaveTextContent("All changes saved");
+    fireEvent.click(button("Save draft"));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "couldn’t confirm the save",
+    );
+    expect(screen.getByRole("status")).not.toHaveTextContent(
+      "All changes saved",
+    );
+    expect(nameField()).toHaveValue("Tara");
+  });
+
+  it("blocks a partially entered native date without treating it as a cleared value", async () => {
+    const request = vi
+      .fn()
+      .mockResolvedValue(response({ ...fixture, version: 3 }));
+    vi.stubGlobal("fetch", request);
+    edit();
+    const date = screen.getAllByLabelText(
+      "Date and time",
+    )[0] as HTMLInputElement;
+    fireEvent.change(date, { target: { value: "" } });
+    const nativeState = { badInput: true };
+    // Chromium reports an empty value with badInput=true while date parts are incomplete.
+    Object.defineProperty(date, "validity", { value: nativeState });
+
+    fireEvent.click(button("Save draft"));
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Complete the ceremony date and time",
+    );
+    expect(date).toHaveAccessibleDescription(
+      /Complete the ceremony date and time/,
+    );
+    expect(request).not.toHaveBeenCalled();
+    fireEvent.click(button("Preview invitation"));
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Fix the highlighted details before previewing",
+    );
+
+    nativeState.badInput = false;
+    fireEvent.click(button("Save draft"));
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("Draft saved"),
+    );
+    expect(
+      JSON.parse(request.mock.calls[0][1].body).data.events[0],
+    ).not.toHaveProperty("startsAt");
+  });
+
+  it("keeps edits and allows retry when loading a newer copy fails", async () => {
+    const latest = { ...fixture, version: 3 };
+    const request = vi
+      .fn()
+      .mockResolvedValueOnce(failure(409))
+      .mockResolvedValueOnce(failure(500))
+      .mockResolvedValueOnce(response(latest));
+    vi.stubGlobal("fetch", request);
+    edit();
+    fireEvent.change(nameField(), { target: { value: "Local unsaved" } });
+    fireEvent.click(button("Save draft"));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "changed in another session",
+    );
+    fireEvent.click(button("Load latest saved copy"));
+    fireEvent.click(button("Discard edits and reload"));
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "couldn’t load the latest saved copy",
+      ),
+    );
+    expect(nameField()).toHaveValue("Local unsaved");
+    expect(button("Save draft")).toBeDisabled();
+    fireEvent.click(button("Discard edits and reload"));
+    await waitFor(() => expect(nameField()).toHaveValue("Tara"));
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Latest saved draft loaded",
+    );
+  });
+
   it("previews the actual renderer with a watermark and preserves editor state on return", () => {
     edit();
     fireEvent.change(nameField(), { target: { value: "Asha" } });

@@ -105,16 +105,18 @@ export function StudioEditor({
     skipped: number;
   }>();
   const running = useRef(false);
+  const formRef = useRef<HTMLFormElement>(null);
   const errorRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLHeadingElement>(null);
   const previewButton = useRef<HTMLButtonElement>(null);
   const eventHeading = useRef<HTMLHeadingElement>(null);
   const newEvent = useRef<string | null>(null);
   const restoreFocus = useRef(false);
+  const savedHostsText = saved.data.hosts?.join("\n") ?? "";
   const dirty =
     JSON.stringify(draft) !== JSON.stringify(saved.data) ||
     Object.keys(dates).length > 0 ||
-    hosts !== (saved.data.hosts?.join("\n") ?? "");
+    hosts !== savedHostsText;
   const signIn = `/sign-in?next=${encodeURIComponent(`/studio/${saved.id}`)}`;
   const zone = timeZoneSchema.safeParse(draft.timeZone);
   const displayZone = zone.success ? zone.data : "UTC";
@@ -209,13 +211,38 @@ export function StudioEditor({
     markEdited();
   }
 
-  function snapshot() {
-    const entries = hosts
-      .split("\n")
-      .map((host) => host.trim())
-      .filter(Boolean);
+  function snapshot(): ReturnType<typeof readEditorSnapshot> {
+    const invalidDates = Array.from(
+      formRef.current?.querySelectorAll<HTMLInputElement>(
+        'input[type="datetime-local"]',
+      ) ?? [],
+    ).flatMap((input, index) =>
+      input.validity.badInput
+        ? [
+            {
+              path: `events.${index}.startsAt`,
+              message:
+                "Complete the ceremony date and time or clear the field.",
+            },
+          ]
+        : [],
+    );
+    if (invalidDates.length) return { issues: invalidDates };
+
+    // A host name can already contain a newline in a saved API draft.
+    const entries =
+      hosts === savedHostsText
+        ? saved.data.hosts
+        : hosts
+            .split("\n")
+            .map((host) => host.trim())
+            .filter(Boolean);
     return readEditorSnapshot(
-      { ...draft, hosts: entries.length ? entries : undefined },
+      {
+        ...draft,
+        hosts:
+          hosts === savedHostsText || entries?.length ? entries : undefined,
+      },
       dates,
     );
   }
@@ -375,6 +402,7 @@ export function StudioEditor({
         missing.
       </p>
       <form
+        ref={formRef}
         aria-label="Invitation editor"
         className="studio-form"
         onSubmit={save}
@@ -388,7 +416,9 @@ export function StudioEditor({
                 ? "Loading latest draft…"
                 : dirty
                   ? "Unsaved changes"
-                  : notice || "All changes saved"}
+                  : problem
+                    ? "Draft needs attention"
+                    : notice || "All changes saved"}
           </span>
           <div className="flex flex-wrap gap-2">
             <Button
