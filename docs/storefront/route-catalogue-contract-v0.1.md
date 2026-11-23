@@ -8,7 +8,7 @@ Date: 19 November 2026. Frontend owner: Developer A. Backend/review counterpart:
 
 The Day 2 owner decision supersedes the roadmap’s Heirloom product name and the proposed Day 1 values below. Afterglow is the single registry ID and catalogue offering. `/demo/heirloom` remains an alias of the same watermarked sample. The homepage carousel uses two views of that invitation, and `/templates` displays one catalogue entry with sample and personalization links.
 
-The existing server checkout sets the Afterglow Test Mode amount to 89,900 INR paise. The storefront displays that same amount with a Test Mode label. Afterglow remains a demo in the database, eligible for private drafts. Test verification grants no publishing entitlement. The amount is for development and does not establish final commercial pricing. Private draft creation requires Supabase configuration and works independently of Razorpay settings.
+Afterglow starts at 89,900 INR paise for Test Mode. The private checkout reads the active Supabase catalogue for new orders and keeps the saved amount on each resumed order. Private drafts work independently of Razorpay settings. Publishing requires its own captured order. [Test checkout contract](../platform/razorpay-test-checkout.md)
 
 The footer links to the project’s public GitHub Issues page for general questions. Public customer policies and a dedicated support channel remain release work.
 

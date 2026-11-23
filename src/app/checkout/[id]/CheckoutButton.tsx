@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Script from "next/script";
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import type {
   CheckoutConfirmation,
   CheckoutOrder,
+  CheckoutState,
 } from "@/lib/checkout/contract";
 
 type RazorpayCheckout = new (options: {
@@ -38,9 +39,6 @@ async function post<T>(url: string, body: object) {
   return { status: response.status, ok: response.ok, data };
 }
 
-type SavedState = "ready" | "pending" | "verified";
-type CheckoutState = SavedState | "failed" | "processing";
-
 const statusCopy: Record<CheckoutState, string> = {
   ready: "",
   pending: "Checkout started. You can resume with your saved draft.",
@@ -60,7 +58,7 @@ export function CheckoutButton({
   draftId: string;
   amount: number;
   currency: string;
-  initialState: SavedState;
+  initialState: CheckoutState;
   keyId?: string;
 }) {
   const router = useRouter();
@@ -74,14 +72,77 @@ export function CheckoutButton({
   const signInUrl = `/sign-in?next=${encodeURIComponent(`/checkout/${draftId}`)}`;
   const storageKey = `yugma:checkout:${draftId}`;
 
-  function remember(payment?: CheckoutConfirmation) {
-    try {
-      if (payment) sessionStorage.setItem(storageKey, JSON.stringify(payment));
-      else sessionStorage.removeItem(storageKey);
-    } catch {
-      // The current page can verify even when browser storage is unavailable.
+  const remember = useCallback(
+    (payment?: CheckoutConfirmation) => {
+      try {
+        if (payment)
+          sessionStorage.setItem(storageKey, JSON.stringify(payment));
+        else sessionStorage.removeItem(storageKey);
+      } catch {
+        // The current page can verify even when browser storage is unavailable.
+      }
+    },
+    [storageKey],
+  );
+
+  const finishVerification = useCallback(
+    (result: "failed" | "verified") => {
+      setState((current) => (current === "verified" ? current : result));
+      setConfirmation(undefined);
+      setMessage("");
+      remember();
+    },
+    [remember],
+  );
+
+  const refreshStatus = useCallback(
+    async (signal?: AbortSignal) => {
+      try {
+        const response = await fetch(`/api/checkout/${draftId}`, {
+          cache: "no-store",
+          signal,
+        });
+        if (signal?.aborted) return;
+        if (response.status === 401) {
+          setSignIn(true);
+          return;
+        }
+        if (!response.ok) throw new Error("Checkout status unavailable");
+        const { state: savedState } = (await response.json()) as {
+          state: CheckoutState;
+        };
+        if (signal?.aborted) return;
+        if (savedState === "verified" || savedState === "failed")
+          finishVerification(savedState);
+        else if (savedState === "processing") {
+          setState((current) =>
+            current === "verified" ? current : "processing",
+          );
+          setMessage("");
+        }
+      } catch {
+        if (!signal) setMessage("Couldn’t check payment status. Try again.");
+      }
+    },
+    [draftId, finishVerification],
+  );
+
+  useEffect(() => {
+    if ((state !== "processing" && state !== "pending") || busy || signIn)
+      return;
+    const controller = new AbortController();
+    let attempts = 0;
+    let timer = setTimeout(poll, 2500);
+    async function poll() {
+      await refreshStatus(controller.signal);
+      if (!controller.signal.aborted && ++attempts < 12)
+        timer = setTimeout(poll, 5000);
     }
-  }
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [busy, refreshStatus, signIn, state]);
 
   function checkStatus() {
     let saved: CheckoutConfirmation | undefined;
@@ -100,7 +161,7 @@ export function CheckoutButton({
       // The server can still show the state of the saved order.
     }
     if (saved) void verify(saved);
-    else router.refresh();
+    else void refreshStatus();
   }
 
   async function verify(payment: CheckoutConfirmation) {
@@ -110,16 +171,14 @@ export function CheckoutButton({
     setMessage("");
     remember(payment);
     try {
-      const { status, ok, data } = await post<{ success: boolean }>(
-        "/api/verify-payment",
-        payment,
-      );
+      const { status, ok, data } = await post<{
+        success?: boolean;
+        state?: CheckoutState;
+      }>("/api/verify-payment", payment);
       if (status === 401) setSignIn(true);
-      else if (ok && data.success) {
-        setState("verified");
-        setConfirmation(undefined);
-        remember();
-      } else if (status === 400 || status === 404) {
+      else if (ok && data.success) finishVerification("verified");
+      else if (ok && data.state === "failed") finishVerification("failed");
+      else if (status === 400 || status === 404) {
         remember();
         setConfirmation(undefined);
         setState("pending");
@@ -148,14 +207,16 @@ export function CheckoutButton({
     }
 
     try {
-      const { ok, status, data } = await post<CheckoutOrder>(
-        "/api/create-order",
-        { draftId },
-      );
+      const { ok, status, data } = await post<
+        CheckoutOrder & { state?: CheckoutState }
+      >("/api/create-order", { draftId });
       if (!ok) {
         if (status === 401) setSignIn(true);
-        else if (status === 409) router.refresh();
-        else setMessage(data.error ?? "Couldn’t start checkout. Try again.");
+        else if (status === 409) {
+          if (data.state === "verified") finishVerification("verified");
+          else if (data.state === "processing") setState("processing");
+          else router.refresh();
+        } else setMessage(data.error ?? "Couldn’t start checkout. Try again.");
         release();
         return;
       }
@@ -258,11 +319,14 @@ export function CheckoutButton({
               Retry verification
             </Button>
           )}
-          {!confirmation && (state === "pending" || state === "failed") && (
-            <Button variant="secondary" disabled={busy} onClick={checkStatus}>
-              Check payment status
-            </Button>
-          )}
+          {!confirmation &&
+            (state === "pending" ||
+              state === "failed" ||
+              state === "processing") && (
+              <Button variant="secondary" disabled={busy} onClick={checkStatus}>
+                Check payment status
+              </Button>
+            )}
         </>
       )}
     </div>

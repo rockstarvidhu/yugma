@@ -1,20 +1,17 @@
 import "server-only";
-import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { getVerifiedSession } from "@/lib/auth/server";
 import { createServiceClient } from "@/lib/auth/service";
 import { draftIdSchema } from "@/lib/drafts/contract";
+import type { CheckoutOrder } from "./contract";
+import { getTestGateway, matchesHmac, matchesSignature } from "./gateway";
 import {
-  AFTERGLOW_PRICE_PAISE,
-  CHECKOUT_CURRENCY,
-  type CheckoutOrder,
-} from "./contract";
-import { getTestGateway, matchesSignature } from "./gateway";
-import {
+  attachGatewayTestOrder,
+  checkoutState,
   findTestOrder,
-  insertTestOrder,
   loadAfterglowCheckoutDraft,
   recordTestPayment,
+  reserveTestOrder,
 } from "./store";
 
 const orderInput = z.strictObject({ draftId: draftIdSchema });
@@ -22,18 +19,29 @@ const orderId = z
   .string()
   .max(80)
   .regex(/^order_[A-Za-z0-9]+$/);
+const paymentId = z
+  .string()
+  .max(80)
+  .regex(/^pay_[A-Za-z0-9]+$/);
 const signatureInput = z.strictObject({
-  razorpay_payment_id: z
-    .string()
-    .max(80)
-    .regex(/^pay_[A-Za-z0-9]+$/),
+  razorpay_payment_id: paymentId,
   razorpay_order_id: orderId,
   razorpay_signature: z
     .string()
     .length(64)
     .regex(/^[0-9a-f]{64}$/i),
 });
-const purchaseAmount = z.number().int().min(100);
+const eventPayment = z.object({
+  id: paymentId,
+  order_id: orderId.nullable(),
+  amount: z.number().int().positive().max(2_147_483_647),
+  currency: z.string().regex(/^[A-Z]{3}$/),
+  status: z.enum(["authorized", "captured", "failed"]),
+});
+const webhookInput = z.object({
+  event: z.enum(["payment.captured", "payment.failed", "order.paid"]),
+  payload: z.object({ payment: z.object({ entity: eventPayment }) }),
+});
 type Session = NonNullable<Awaited<ReturnType<typeof getVerifiedSession>>>;
 
 function respond(data: unknown, status = 200) {
@@ -47,20 +55,18 @@ function failure(status: number, error: string) {
   return respond({ error }, status);
 }
 
-async function checkoutJson(request: Request) {
+async function readBody(request: Request, maxBytes: number) {
   const contentType = request.headers
     .get("content-type")
     ?.split(";")[0]
     ?.trim()
     .toLowerCase();
   if (contentType !== "application/json" || !request.body) return null;
-  const maxBytes = 4096;
   if (Number(request.headers.get("content-length")) > maxBytes) return null;
 
   const reader = request.body.getReader();
-  const decoder = new TextDecoder("utf-8", { fatal: true });
+  const chunks: Uint8Array[] = [];
   let bytes = 0;
-  let text = "";
   try {
     for (;;) {
       const { value, done } = await reader.read();
@@ -70,13 +76,22 @@ async function checkoutJson(request: Request) {
         void reader.cancel().catch(() => undefined);
         return null;
       }
-      text += decoder.decode(value, { stream: true });
+      chunks.push(value);
     }
-    return JSON.parse(text + decoder.decode()) as unknown;
+    return Buffer.concat(chunks, bytes);
   } catch {
     return null;
   } finally {
     reader.releaseLock();
+  }
+}
+
+function parseJson(body: Uint8Array | null): unknown {
+  if (!body) return null;
+  try {
+    return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(body));
+  } catch {
+    return null;
   }
 }
 
@@ -88,7 +103,7 @@ async function withCheckout<T>(
   try {
     const session = await getVerifiedSession();
     if (!session) return failure(401, "Sign in to use checkout.");
-    const input = schema.safeParse(await checkoutJson(request));
+    const input = schema.safeParse(parseJson(await readBody(request, 4096)));
     if (!input.success) return failure(400, "The checkout request is invalid.");
     return await operation(session, input.data);
   } catch {
@@ -103,30 +118,47 @@ export function createOrder(request: Request) {
     const { sdk } = getTestGateway();
     const db = createServiceClient();
     let order = await findTestOrder(db, session.ownerId, { draftId });
-    const amount = purchaseAmount.parse(AFTERGLOW_PRICE_PAISE);
     if (!order) {
-      const receipt = `test_${randomUUID().replaceAll("-", "")}`;
-      const created = await sdk.orders.create({
-        amount,
-        currency: CHECKOUT_CURRENCY,
-        receipt,
-        partial_payment: false,
-      });
-      if (
-        Number(created.amount) !== amount ||
-        created.currency !== CHECKOUT_CURRENCY
-      )
-        throw new Error("Razorpay returned different order details");
-      order = await insertTestOrder(
-        db,
-        session.ownerId,
-        draft,
-        orderId.parse(created.id),
-        amount,
-      );
+      const reservation = await reserveTestOrder(db, session.ownerId, draftId);
+      if (reservation) {
+        const receipt = `test_${reservation.id.replaceAll("-", "")}`;
+        const previousOrders = reservation.recovering
+          ? await sdk.orders.all({ receipt, count: 10 })
+          : null;
+        const recovered = previousOrders?.items.find(
+          (item) => item.receipt === receipt,
+        );
+        const created =
+          recovered ??
+          (await sdk.orders.create({
+            amount: reservation.amount_paise,
+            currency: reservation.currency,
+            receipt,
+            partial_payment: false,
+          }));
+        if (
+          Number(created.amount) !== reservation.amount_paise ||
+          created.currency !== reservation.currency ||
+          created.receipt !== receipt
+        )
+          throw new Error("Razorpay returned different order details");
+        order = await attachGatewayTestOrder(
+          db,
+          session.ownerId,
+          reservation,
+          orderId.parse(created.id),
+        );
+      }
+      order ??= await findTestOrder(db, session.ownerId, { draftId });
+      if (!order)
+        return failure(
+          503,
+          "Checkout is still preparing your order. Try again shortly.",
+        );
     }
-    if (order.status === "test_verified")
-      return failure(409, "This draft already has a verified test payment.");
+    const state = checkoutState(order);
+    if (state === "verified" || state === "processing")
+      return respond({ state }, 409);
     return respond({
       order_id: order.gateway_order_id,
       amount: order.amount_paise,
@@ -168,14 +200,76 @@ export function verifyPayment(request: Request) {
     ) {
       return failure(400, "Payment details do not match this order.");
     }
-    if (payment.status !== "captured")
-      return failure(
-        409,
-        "The test payment has not been captured. Try verifying again.",
-      );
-    const saved = await recordTestPayment(db, ownerId, order, paymentId);
-    return saved
-      ? respond({ success: true })
-      : failure(409, "Checkout changed. Reload and try again.");
+    if (
+      payment.status !== "captured" &&
+      payment.status !== "authorized" &&
+      payment.status !== "failed"
+    )
+      return respond({ state: "processing" }, 409);
+    const state = await recordTestPayment(
+      db,
+      {
+        id: paymentId,
+        order_id: order.gateway_order_id,
+        amount: order.amount_paise,
+        currency: order.currency,
+        status: payment.status,
+      },
+      { ownerId },
+    );
+    if (state === "verified") return respond({ success: true });
+    if (state === "failed") return respond({ state });
+    if (state === "processing") return respond({ state }, 409);
+    return failure(409, "Checkout changed. Check your payment status.");
   });
+}
+
+export async function getCheckoutStatus(draftId: string) {
+  try {
+    const session = await getVerifiedSession();
+    if (!session) return failure(401, "Sign in to use checkout.");
+    if (!draftIdSchema.safeParse(draftId).success)
+      return failure(404, "Draft unavailable for checkout.");
+    const order = await findTestOrder(createServiceClient(), session.ownerId, {
+      draftId,
+    });
+    if (!order && !(await loadAfterglowCheckoutDraft(session, draftId)))
+      return failure(404, "Draft unavailable for checkout.");
+    return respond({ state: checkoutState(order) });
+  } catch {
+    return failure(500, "Couldn’t check payment status. Try again.");
+  }
+}
+
+export async function razorpayWebhook(request: Request) {
+  const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+  if (!secret || secret === process.env.RAZORPAY_KEY_SECRET)
+    return failure(503, "Webhook unavailable.");
+  try {
+    const body = await readBody(request, 256 * 1024);
+    const signature = request.headers.get("x-razorpay-signature") ?? "";
+    if (!body || !matchesHmac(body, signature, secret))
+      return failure(401, "Invalid webhook signature.");
+    const eventId = request.headers.get("x-razorpay-event-id") ?? "";
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(eventId))
+      return failure(400, "Invalid webhook event ID.");
+    const input = webhookInput.safeParse(parseJson(body));
+    if (!input.success) return failure(400, "Invalid webhook event.");
+    const {
+      event,
+      payload: {
+        payment: { entity },
+      },
+    } = input.data;
+    const expectedEvent = `payment.${entity.status}`;
+    if (
+      event !== expectedEvent &&
+      !(event === "order.paid" && entity.status === "captured")
+    )
+      return failure(400, "Invalid webhook payment status.");
+    await recordTestPayment(createServiceClient(), entity, { eventId });
+    return new Response(null, { status: 204 });
+  } catch {
+    return failure(503, "Couldn’t process the webhook. Retry delivery.");
+  }
 }
