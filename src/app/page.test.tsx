@@ -5,10 +5,18 @@ import BrandPreview from "./dev/brand/page";
 import TemplatesPage, { metadata as catalogueMetadata } from "./templates/page";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { Button } from "@/components/ui/Button";
+import { canCreatePrivateDraft } from "@/lib/auth/service";
+import { getRazorpayTestConfig } from "@/lib/checkout/gateway";
 
 vi.mock("next/font/google", () => ({
-  Manrope: () => ({ variable: "mock-manrope" }),
-  Instrument_Serif: () => ({ variable: "mock-instrument" }),
+  Inter_Tight: () => ({ variable: "mock-inter-tight" }),
+}));
+
+vi.mock("@/lib/auth/service", () => ({
+  canCreatePrivateDraft: vi.fn(() => false),
+}));
+vi.mock("@/lib/checkout/gateway", () => ({
+  getRazorpayTestConfig: vi.fn(() => null),
 }));
 
 beforeEach(() => {
@@ -21,6 +29,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.resetAllMocks();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });
@@ -31,16 +40,22 @@ describe("YUGMA brand foundations", () => {
     expect(
       screen.getByRole("heading", {
         level: 1,
-        name: "Some moments deserve more.",
+        name: "Cinematic digital wedding invitations",
       }),
     ).toBeInTheDocument();
+    const header = screen.getByRole("banner");
+    const mark = within(header).getByRole("link", { name: "YUGMA home" });
     expect(
-      screen.getAllByRole("img", { name: "YUGMA home" })[0],
-    ).toHaveAttribute("src", "/brand/yugma-wordmark-forest.svg");
+      mark.querySelector('img[src="/brand/yugma-emblem-white.svg"]'),
+    ).toBeInTheDocument();
+    expect(mark.querySelector('img[src*="wordmark"]')).toBeNull();
     expect(
-      screen.getByText(
-        "Digital wedding invitations for the story only you can tell.",
+      document.querySelector(
+        '.home-hero img[src="/brand/yugma-wordmark-white.svg"]',
       ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("An invitation worth experiencing."),
     ).toBeInTheDocument();
     expect(metadata.openGraph).toMatchObject({
       images: [{ url: "/brand/yugma-og-brand.png", width: 1200, height: 630 }],
@@ -58,6 +73,24 @@ describe("YUGMA brand foundations", () => {
       "src",
       "/brand/yugma-emblem-sand.svg",
     );
+  });
+  it("keeps the homepage price-free with Studio and Razorpay Test Mode configured", () => {
+    vi.mocked(canCreatePrivateDraft).mockReturnValue(true);
+    vi.mocked(getRazorpayTestConfig).mockReturnValue({
+      keyId: "rzp_test_Fixture",
+      keySecret: "fixture-test-signing-secret",
+    });
+
+    render(<Home />);
+    const navigation = screen.getByRole("navigation", {
+      name: "Main navigation",
+    });
+    expect(
+      within(navigation).getByRole("link", { name: "Studio" }),
+    ).toHaveAttribute("href", "/studio");
+    expect(
+      screen.queryByText(/₹|one-time in Test Mode/i),
+    ).not.toBeInTheDocument();
   });
   it("lists the registered design with separate sample and personalization links", () => {
     render(<TemplatesPage />);

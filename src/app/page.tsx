@@ -1,18 +1,13 @@
 import type { Metadata } from "next";
-import { Instrument_Serif, Manrope } from "next/font/google";
+import { Inter_Tight } from "next/font/google";
 import { Storefront } from "@/components/storefront/Storefront";
+import { canCreatePrivateDraft } from "@/lib/auth/service";
 
-const manrope = Manrope({
+const interTight = Inter_Tight({
   subsets: ["latin"],
+  weight: ["500", "600"],
   display: "swap",
-  variable: "--font-home-manrope",
-});
-const accent = Instrument_Serif({
-  subsets: ["latin"],
-  weight: "400",
-  style: "italic",
-  display: "swap",
-  variable: "--font-home-accent",
+  variable: "--font-home-inter-tight",
 });
 
 export const metadata: Metadata = {
@@ -39,9 +34,11 @@ export const metadata: Metadata = {
 };
 
 export default function Home() {
+  const studioAvailable = canCreatePrivateDraft();
   return (
-    <div className={`${manrope.variable} ${accent.variable}`}>
-      <Storefront />
-    </div>
+    <Storefront
+      fontClass={interTight.variable}
+      studioAvailable={studioAvailable}
+    />
   );
 }

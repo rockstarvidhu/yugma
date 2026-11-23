@@ -38,33 +38,6 @@ const afterglow: StorefrontTemplate = {
   },
 };
 
-export type StorefrontCollectionItem = Pick<
-  StorefrontTemplate,
-  "name" | "preview"
-> & {
-  templateId: string;
-  demoUrl: string;
-};
-
 export function getStorefrontCatalogue(registry = templateRegistry) {
   return registry.get(afterglow.templateId) ? [afterglow] : [];
-}
-
-export function getStorefrontCollection(
-  registry = templateRegistry,
-): readonly StorefrontCollectionItem[] {
-  return getStorefrontCatalogue(registry).flatMap((template) => [
-    template,
-    {
-      templateId: "afterglow-celebration-preview",
-      name: "Afterglow celebrations",
-      demoUrl: "/demo/afterglow#celebration",
-      preview: {
-        src: "/images/storefront/afterglow-celebration.webp",
-        alt: "Celebrations section of the Afterglow sample invitation",
-        width: 592,
-        height: 438,
-      },
-    },
-  ]);
 }
