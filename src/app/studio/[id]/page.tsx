@@ -4,17 +4,11 @@ import { notFound } from "next/navigation";
 import { StudioEditor } from "@/components/studio/StudioEditor";
 import { StudioShell } from "@/components/studio/StudioShell";
 import { getServerAuth, requireStudioUser } from "@/lib/auth/server";
-import { canCreatePrivateDraft, createServiceClient } from "@/lib/auth/service";
-import { getRazorpayTestConfig } from "@/lib/checkout/gateway";
-import {
-  findTestOrder,
-  loadAfterglowCheckoutDraft,
-} from "@/lib/checkout/store";
+import { canCreatePrivateDraft } from "@/lib/auth/service";
 import { draftIdSchema } from "@/lib/drafts/contract";
 import { loadDraft } from "@/lib/drafts/store";
 import { privateMediaConfigured } from "@/lib/media/storage";
 import { getStorefrontCatalogue } from "@/lib/storefront-catalogue";
-import { CheckoutButton } from "./CheckoutButton";
 
 export const metadata: Metadata = {
   title: "Edit private invitation",
@@ -50,21 +44,6 @@ export default async function DraftStudioPage({
   if (!result.draft) notFound();
   const draft = result.draft;
 
-  // Preserve the existing optional Test Mode flow independently of the editor.
-  const config = getRazorpayTestConfig();
-  let checkout: "verified" | "available" | "unavailable" | undefined;
-  if (config && canCreatePrivateDraft() && draft.templateKey === "afterglow") {
-    try {
-      if (await loadAfterglowCheckoutDraft(session, id)) {
-        const order = await findTestOrder(createServiceClient(), user.id, {
-          draftId: id,
-        });
-        checkout = order?.status === "test_verified" ? "verified" : "available";
-      }
-    } catch {
-      checkout = "unavailable";
-    }
-  }
   const templateName =
     getStorefrontCatalogue().find(
       ({ templateId }) => templateId === draft.templateKey,
@@ -76,21 +55,8 @@ export default async function DraftStudioPage({
       initialDraft={draft}
       templateName={templateName}
       mediaAvailable={privateMediaConfigured() && canCreatePrivateDraft()}
-      checkout={
-        checkout && (
-          <details className="studio-checkout">
-            <summary>Razorpay Test Mode</summary>
-            {checkout === "verified" && (
-              <p role="status">Test payment verified. No money was charged.</p>
-            )}
-            {checkout === "available" && config && (
-              <CheckoutButton draftId={id} keyId={config.keyId} />
-            )}
-            {checkout === "unavailable" && (
-              <p>Razorpay Test Mode is temporarily unavailable.</p>
-            )}
-          </details>
-        )
+      checkoutUrl={
+        draft.templateKey === "afterglow" ? `/checkout/${id}` : undefined
       }
     />
   );
