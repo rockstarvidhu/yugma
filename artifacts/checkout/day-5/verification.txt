@@ -17,3 +17,9 @@ PASS Browser smoke: client amount rejected, fixture modal matched ₹899 and ser
 PASS Browser smoke: cancellation, failure, retry using the same order and saved draft reload
 PASS Browser smoke: callback showed processing until capture and recovered verification in the same tab
 PASS Browser smoke: verified test status persisted after reopening, no share slug
+
+PASS Razorpay Test Mode Orders API authenticated with current local credentials
+PASS Genuine Razorpay Standard Checkout displayed the matching server-created ₹899 INR order
+PASS Genuine modal cancellation saved the draft and retry reused the order after reload
+PASS Disposable PostgreSQL retained one pending order and the private draft
+PASS Razorpay key secret absent from all 47 static build files scanned

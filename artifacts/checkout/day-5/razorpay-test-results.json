@@ -1,0 +1,13 @@
+{
+  "provider": "Genuine Razorpay Standard Checkout in Test Mode",
+  "dataStore": "Disposable PostgreSQL with local Supabase-compatible transport",
+  "route": "/checkout/e5100000-0000-4000-8000-000000000001",
+  "orderId": "order_U3UlpkHKXl7Rdt",
+  "amountPaise": 89900,
+  "currency": "INR",
+  "checks": [
+    "Genuine Razorpay Standard Checkout matched the application order and the ₹899 INR amount confirmed by Razorpay's Orders API.",
+    "Cancelling Razorpay checkout and reloading preserved the draft. Retry reopened Standard Checkout with the exact same order ID and amount.",
+    "Cancellation and retry left exactly one pending test order and the invitation private."
+  ]
+}
