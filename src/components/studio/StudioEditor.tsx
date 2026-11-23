@@ -1,13 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {
-  useEffect,
-  useRef,
-  useState,
-  type FormEvent,
-  type ReactNode,
-} from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { DemoWatermark } from "@/components/preview/DemoWatermark";
 import { InvitationRenderer } from "@/invitations/renderer/InvitationRenderer";
@@ -87,12 +81,12 @@ function requestProblem(status: number, issues?: FieldIssue[]): Problem {
 export function StudioEditor({
   initialDraft,
   templateName,
-  checkout,
+  checkoutUrl,
   mediaAvailable = false,
 }: {
   initialDraft: Draft;
   templateName: string;
-  checkout?: ReactNode;
+  checkoutUrl?: string;
   mediaAvailable?: boolean;
 }) {
   const [saved, setSaved] = useState(initialDraft);
@@ -634,7 +628,27 @@ export function StudioEditor({
           </div>
         </section>
       </form>
-      {checkout}
+      {checkoutUrl && (
+        <section
+          className="studio-panel"
+          aria-labelledby="studio-checkout-heading"
+        >
+          <h2 id="studio-checkout-heading" className="font-semibold">
+            Test checkout
+          </h2>
+          {dirty || busy || photoBusy ? (
+            <p>Finish saving your draft before continuing to checkout.</p>
+          ) : (
+            <Link
+              className="studio-link justify-self-start"
+              href={checkoutUrl}
+              prefetch={false}
+            >
+              Continue to checkout
+            </Link>
+          )}
+        </section>
+      )}
     </StudioShell>
   );
 }

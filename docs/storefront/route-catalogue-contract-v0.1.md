@@ -24,7 +24,7 @@ The footer links to the project’s public GitHub Issues page for general questi
 | `/demo/[slug]`       | Two concrete routes exist   | Use the existing `/demo/afterglow` and `/demo/heirloom`; no generic dynamic route is introduced |
 | `/create/[template]` | Proposed/reserved           | Creation destination remains null; no public CTA                                                |
 | `/studio/[id]`       | Future private editor       | Developer B owns authorization; no route or link today                                          |
-| `/checkout/[id]`     | Future checkout             | No route, payment promise or link today                                                         |
+| `/checkout/[id]`     | Private test checkout       | Saved draft summary, Razorpay Test Mode launch and server-verified status                       |
 | `/i/[slug]`          | Future published invitation | No publication capability or link today                                                         |
 
 Do not infer a public URL from a template ID. Future destination activation requires an actual implemented route and the corresponding server-side authorization. Demo watermarks and client state never authorize purchases or publishing.

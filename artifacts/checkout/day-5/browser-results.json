@@ -1,0 +1,18 @@
+{
+  "providers": {
+    "authTransport": "Local Supabase-compatible transport",
+    "database": "Disposable PostgreSQL (PGlite)",
+    "razorpay": "Local API and Checkout JS fixture"
+  },
+  "route": "/checkout/e5100000-0000-4000-8000-000000000001",
+  "orderId": "order_YugmaDay05Fixture",
+  "amountPaise": 89900,
+  "currency": "INR",
+  "checks": [
+    "Anonymous status is private and checkout returns to the exact draft after sign-in",
+    "The summary displayed the existing ₹899 catalogue price and saved draft details. Edit and all four staging information links resolved.",
+    "Client amount tampering was rejected. The provider fixture received the matching server order and amount. Cancelling and reloading preserved the draft.",
+    "Failure retried the existing order. The signed callback showed processing, and the same-tab reload recovered the confirmation for retry.",
+    "Delayed capture appeared after retry and persisted after closing and reopening the tab. The invitation stayed private."
+  ]
+}

@@ -40,8 +40,7 @@
 }
 .studio-panel,
 .studio-draft-card,
-.studio-form fieldset,
-.studio-checkout {
+.studio-form fieldset {
   min-inline-size: 0;
   padding: clamp(0.75rem, 3vw, 1.5rem);
   background: #fffcf5;
@@ -174,10 +173,4 @@
 }
 .studio-primary-link:hover {
   background: #465743;
-}
-.studio-checkout summary {
-  cursor: pointer;
-  min-height: 44px;
-  padding-block: 0.65rem;
-  font-weight: 650;
 }

@@ -7,6 +7,8 @@ describe("studio sign-in return path", () => {
   it("preserves the studio and its draft route", () => {
     expect(studioReturnPath("/studio")).toBe("/studio");
     expect(studioReturnPath(draft)).toBe(draft);
+    const checkout = draft.replace("/studio/", "/checkout/");
+    expect(studioReturnPath(checkout)).toBe(checkout);
     expect(studioReturnPath("/create/afterglow")).toBe("/create/afterglow");
   });
 
