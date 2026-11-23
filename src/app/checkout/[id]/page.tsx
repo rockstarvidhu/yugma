@@ -5,8 +5,10 @@ import { notFound } from "next/navigation";
 import { StudioShell } from "@/components/studio/StudioShell";
 import { getServerAuth, requireStudioUser } from "@/lib/auth/server";
 import { canCreatePrivateDraft, createServiceClient } from "@/lib/auth/service";
+import { CHECKOUT_CURRENCY } from "@/lib/checkout/contract";
 import { getRazorpayTestConfig } from "@/lib/checkout/gateway";
 import {
+  checkoutState,
   findTestOrder,
   loadAfterglowCheckoutDraft,
 } from "@/lib/checkout/store";
@@ -53,31 +55,26 @@ export default async function CheckoutPage({
   const template = getStorefrontCatalogue().find(
     ({ templateId }) => templateId === draft.templateKey,
   );
-  if (!eligible || !template)
-    return (
-      <StudioShell title="Invitation checkout" back={edit}>
-        <p>This invitation is currently unavailable for test checkout.</p>
-      </StudioShell>
-    );
-
   const payment = canCreatePrivateDraft()
     ? await findTestOrder(createServiceClient(), user.id, { draftId: id })
         .then((order) => ({ order }))
         .catch(() => null)
     : null;
-  const keyId = getRazorpayTestConfig()?.keyId;
-  const amount = payment?.order?.amount_paise ?? template.price.amountMinor;
-  const currency = payment?.order?.currency ?? template.price.currency;
-  const initialState =
-    payment?.order?.status === "test_verified"
-      ? "verified"
-      : payment?.order
-        ? "pending"
-        : "ready";
+  const keyId = eligible ? getRazorpayTestConfig()?.keyId : undefined;
+  const amount = payment?.order?.amount_paise ?? eligible?.amount;
+  const currency =
+    payment?.order?.currency ?? eligible?.currency ?? CHECKOUT_CURRENCY;
+  if (amount === undefined || !template)
+    return (
+      <StudioShell title="Invitation checkout" back={edit}>
+        <p>This invitation is currently unavailable for test checkout.</p>
+      </StudioShell>
+    );
+  const initialState = checkoutState(payment?.order ?? null);
   const priceFormat = new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency,
-    minimumFractionDigits: amount && amount % 100 ? 2 : 0,
+    minimumFractionDigits: amount % 100 ? 2 : 0,
     maximumFractionDigits: 2,
   });
   const names = [
@@ -124,11 +121,9 @@ export default async function CheckoutPage({
           aria-labelledby="checkout-payment"
         >
           <h2 id="checkout-payment">Order total</h2>
-          {amount !== null && (
-            <p className="font-editorial checkout-price">
-              {priceFormat.format(amount / 100)}
-            </p>
-          )}
+          <p className="font-editorial checkout-price">
+            {priceFormat.format(amount / 100)}
+          </p>
           <p>
             One-time test payment in INR. Use Razorpay test details. No money
             will be charged.
@@ -161,7 +156,7 @@ export default async function CheckoutPage({
               </Link>
             </nav>
           )}
-          {payment && amount !== null && (keyId || payment.order) ? (
+          {payment && (keyId || payment.order) ? (
             <CheckoutButton
               key={`${id}:${initialState}:${amount}`}
               draftId={id}

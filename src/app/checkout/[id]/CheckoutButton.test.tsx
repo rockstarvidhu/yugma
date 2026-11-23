@@ -195,6 +195,41 @@ describe("Studio Test Mode checkout", () => {
     expect(sessionStorage.getItem(`yugma:checkout:${draftId}`)).toBeNull();
   });
 
+  it("keeps processing visible until a webhook-updated order is verified", async () => {
+    vi.useFakeTimers();
+    try {
+      fetcher
+        .mockResolvedValueOnce(Response.json({ state: "processing" }))
+        .mockResolvedValueOnce(Response.json({ state: "verified" }));
+      render(
+        <CheckoutButton
+          draftId={draftId}
+          amount={order.amount}
+          currency={order.currency}
+          initialState="processing"
+          keyId={keyId}
+        />,
+      );
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Processing payment.",
+      );
+      expect(
+        screen.queryByRole("button", { name: "Open Razorpay Test Mode" }),
+      ).not.toBeInTheDocument();
+      await act(() => vi.advanceTimersByTimeAsync(2500));
+      expect(screen.queryByText(verifiedCopy)).not.toBeInTheDocument();
+      await act(() => vi.advanceTimersByTimeAsync(5000));
+      expect(screen.getByText(verifiedCopy)).toBeVisible();
+      expect(fetcher).toHaveBeenNthCalledWith(
+        2,
+        `/api/checkout/${draftId}`,
+        expect.objectContaining({ cache: "no-store" }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("offers sign-in with a return to the same checkout when the session expires", async () => {
     fetcher.mockResolvedValueOnce(Response.json({}, { status: 401 }));
     fireEvent.click(renderCheckout());

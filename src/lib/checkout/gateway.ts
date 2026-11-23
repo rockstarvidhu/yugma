@@ -31,10 +31,16 @@ export function matchesSignature(
   signature: string,
   secret: string,
 ) {
+  return matchesHmac(`${orderId}|${paymentId}`, signature, secret);
+}
+
+export function matchesHmac(
+  body: string | Uint8Array,
+  signature: string,
+  secret: string,
+) {
   if (signature.length !== 64 || !/^[0-9a-f]{64}$/i.test(signature))
     return false;
-  const expected = createHmac("sha256", secret)
-    .update(`${orderId}|${paymentId}`)
-    .digest();
+  const expected = createHmac("sha256", secret).update(body).digest();
   return timingSafeEqual(expected, Buffer.from(signature, "hex"));
 }

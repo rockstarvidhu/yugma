@@ -7,6 +7,9 @@ export type CheckoutOrder = {
   currency: typeof CHECKOUT_CURRENCY;
 };
 
+export type CheckoutState =
+  "ready" | "pending" | "failed" | "processing" | "verified";
+
 export type CheckoutConfirmation = {
   razorpay_payment_id: string;
   razorpay_order_id: string;

@@ -1,0 +1,20 @@
+{
+  "route": "/checkout/e5100000-0000-4000-8000-000000000001",
+  "providerOrder": {
+    "order_id": "order_U3VPr6QvsjnLXS",
+    "amount": 98765,
+    "currency": "INR"
+  },
+  "database": "Disposable PostgreSQL with a local Supabase-compatible transport",
+  "razorpayCheckout": "Genuine Test Mode order and modal",
+  "webhook": "Locally signed fixture events and synthetic payment IDs",
+  "checks": [
+    "Two simultaneous app requests shared a genuine Razorpay Test Mode order at the Supabase catalogue price of 98,765 INR paise. Client amount and currency fields were rejected.",
+    "The genuine modal used the stored ₹987.65 snapshot after the catalogue price changed, and cancellation preserved the draft.",
+    "A signed local failure event made the order retryable. Retry opened the same genuine Razorpay order.",
+    "The Razorpay receipt lookup confirmed exactly one provider order after concurrent create, cancellation, and retry.",
+    "Invalid webhook HMAC and mismatched amounts did not verify the order. Concurrent duplicate capture delivery committed one audit event before acknowledgment. A later failure could not overwrite verification.",
+    "The browser recovered the simulated signed capture through status polling, retained verification after reload, and kept the draft private."
+  ],
+  "receiptLookup": "Razorpay returned one matching order when checked again after the receipt index caught up."
+}

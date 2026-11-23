@@ -45,8 +45,8 @@ declare
   payload jsonb := current_setting('yugma.test_payload')::jsonb;
 begin
   if not exists (select 1 from public.templates where slug = 'afterglow'
-    and status = 'demo' and price_in_paise is null and draft_eligible) then
-    raise exception 'Afterglow is not eligible for private drafts at its demo price';
+    and status = 'active' and price_in_paise = 89900 and draft_eligible) then
+    raise exception 'Afterglow is missing the active Test Mode catalogue price';
   end if;
   insert into public.templates (slug, registry_key) values ('fixture-design', 'fixture-design');
   if exists (select 1 from public.create_private_draft(owner, 'fixture-design', payload)) then
@@ -205,21 +205,60 @@ begin
   if exists (select 1 from public.get_published_invitation('fictional-celebration')) then
     raise exception 'The public lookup returned an unpublished invitation';
   end if;
+  begin
+    perform public.record_razorpay_test_payment(
+      'order_test_fixture', 'pay_test_fixture', 89900, 'INR', 'captured', null, 'untrusted_event'
+    );
+    raise exception 'An anonymous caller could invoke the payment reconciler';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform public.reserve_razorpay_test_order(
+      'e1000000-0000-4000-8000-000000000001', 'e1000000-0000-4000-8000-000000000002'
+    );
+    raise exception 'An anonymous caller could reserve a checkout';
+  exception when insufficient_privilege then null;
+  end;
 end;
 $$;
 
 reset role;
 set local role service_role;
 
--- Temporarily enable pricing for the pre-existing order and public projection tests.
+-- Simulate a newer catalogue price. Existing test snapshots must retain their original amount.
 update public.templates set status = 'active', price_in_paise = 150000 where slug = 'afterglow';
 
 do $$
 declare
   draft_id uuid := current_setting('yugma.test_draft_id')::uuid;
+  draft_owner uuid;
+  reservation_draft uuid;
+  initial_claim record;
+  recovered_claim record;
   test_order_id uuid;
   test_checkout_id uuid;
 begin
+  select owner_id into strict draft_owner from public.invitations where id = draft_id;
+  select id into strict reservation_draft from public.create_private_draft(draft_owner, 'afterglow', '{}');
+  if exists (select 1 from public.reserve_razorpay_test_order(gen_random_uuid(), reservation_draft))
+    then raise exception 'Cross-owner checkout reservation'; end if;
+  select * into strict initial_claim from public.reserve_razorpay_test_order(draft_owner, reservation_draft);
+  if initial_claim.amount_paise <> 150000 or initial_claim.currency <> 'INR' or initial_claim.recovering
+    then raise exception 'Reservation did not take the active catalogue snapshot'; end if;
+  if exists (select 1 from public.reserve_razorpay_test_order(draft_owner, reservation_draft))
+    then raise exception 'A second creator took an active reservation'; end if;
+  update public.orders set reservation_expires_at = statement_timestamp() - interval '1 second'
+    where id = initial_claim.id;
+  select * into strict recovered_claim from public.reserve_razorpay_test_order(draft_owner, reservation_draft);
+  if recovered_claim.id <> initial_claim.id or recovered_claim.reservation_token = initial_claim.reservation_token
+    or recovered_claim.amount_paise <> initial_claim.amount_paise or not recovered_claim.recovering
+    then raise exception 'Reservation recovery changed the immutable snapshot or retained the old claim'; end if;
+  update public.orders set gateway_order_id = 'order_ReservedTest',
+    status = 'test_created', reservation_token = null, reservation_expires_at = null
+    where id = recovered_claim.id and reservation_token = recovered_claim.reservation_token;
+  if exists (select 1 from public.reserve_razorpay_test_order(draft_owner, reservation_draft))
+    then raise exception 'A finalized order was reserved again'; end if;
+
   insert into public.orders (
     invitation_id, owner_id, template_id, amount_paise, gateway_order_id, status
   )
@@ -243,9 +282,46 @@ begin
   exception when check_violation then null;
   end;
 
-  update public.orders
-    set status = 'test_verified', gateway_payment_id = 'pay_test_fixture', verified_at = now()
-    where id = test_checkout_id;
+  begin
+    update public.orders set amount_paise = 150000 where id = test_checkout_id;
+    raise exception 'The database accepted a changed test checkout snapshot';
+  exception when check_violation then null;
+  end;
+
+  if public.record_razorpay_test_payment('order_test_fixture', 'pay_failed', 89900,
+    'INR', 'failed', null, 'test_failed_event') <> 'failed'
+  then raise exception 'Test failure was not recorded'; end if;
+  if public.record_razorpay_test_payment('order_test_fixture', 'pay_test_fixture', 150000,
+    'INR', 'captured', null, 'test_price_mismatch') <> 'ignored'
+  then raise exception 'Webhook applied the new catalogue price to an old order'; end if;
+  if public.record_razorpay_test_payment('order_test_fixture', 'pay_test_fixture', 89900,
+    'INR', 'authorized', (select owner_id from public.invitations where id = draft_id), null) <> 'processing'
+  then raise exception 'An authorized payment did not stay processing'; end if;
+  if public.record_razorpay_test_payment('order_test_fixture', 'pay_failed', 89900,
+    'INR', 'failed', null, 'test_late_failure') <> 'processing'
+  then raise exception 'A previous attempt replaced a processing payment'; end if;
+  if public.record_razorpay_test_payment('order_test_fixture', 'pay_test_fixture', 89900,
+    'INR', 'captured', null, 'test_capture_event') <> 'verified'
+  then raise exception 'Signed capture did not reconcile the test order'; end if;
+  if public.record_razorpay_test_payment('order_test_fixture', 'pay_test_fixture', 89900,
+    'INR', 'captured', null, 'test_capture_event') <> 'duplicate'
+  then raise exception 'Webhook replay was not deduplicated'; end if;
+  perform public.record_razorpay_test_payment('order_test_fixture', 'pay_failed', 89900,
+    'INR', 'failed', null, 'test_stale_failure');
+  if not exists (
+    select 1 from public.orders as o
+    join public.payment_events as e on e.order_id = o.id
+    where o.id = test_checkout_id and o.status = 'test_verified' and o.gateway_payment_id = 'pay_test_fixture'
+      and o.last_failed_at is not null and o.processing_at is not null and o.verified_at is not null
+      and e.gateway_event_id = 'test_capture_event' and e.processed_at is not null
+  ) then raise exception 'Webhook capture or audit timestamps were not retained'; end if;
+  if not exists (select 1 from public.invitations where id = draft_id and status = 'draft' and share_slug is null)
+  then raise exception 'Test checkout changed the private invitation'; end if;
+  begin
+    update public.orders set status = 'captured' where id = test_checkout_id;
+    raise exception 'A verified test order could be converted to live';
+  exception when check_violation then null;
+  end;
 
   begin
     update public.invitations set status = 'paid' where id = draft_id;
