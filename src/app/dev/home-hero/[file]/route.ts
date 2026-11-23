@@ -1,23 +1,40 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { desktopHeroSources, mobileHeroSources } from "@/lib/home-hero-assets";
+import {
+  desktopHeroSources,
+  mobileHeroSources,
+  storefrontPhotoReviewEnabled,
+} from "@/lib/home-hero-assets";
+
+const privateHeaders = {
+  "Cache-Control": "private, no-store",
+  "X-Robots-Tag": "noindex, noimageindex",
+};
 
 export async function GET(
   _request: Request,
-  { params }: { params: Promise<{ file: string }> },
+  { params }: RouteContext<"/dev/home-hero/[file]">,
 ) {
-  if (process.env.NODE_ENV !== "development")
-    return new Response(null, { status: 404 });
-
   const { file } = await params;
-  const sources = [...desktopHeroSources, ...mobileHeroSources];
-  if (!sources.some(([name]) => name === file))
-    return new Response(null, { status: 404 });
-
-  const image = await readFile(
-    join(process.cwd(), "assets", "home-hero", file),
+  const allowed = [...desktopHeroSources, ...mobileHeroSources].some(
+    ([name]) => name === file,
   );
-  return new Response(new Uint8Array(image), {
-    headers: { "Content-Type": "image/webp", "Cache-Control": "no-store" },
-  });
+  if (storefrontPhotoReviewEnabled() && allowed) {
+    try {
+      const bytes = await readFile(
+        join(process.cwd(), "assets", "storefront-hero-review", file),
+      );
+      return new Response(new Uint8Array(bytes), {
+        headers: { ...privateHeaders, "Content-Type": "image/webp" },
+      });
+    } catch (error) {
+      if (!(
+        error instanceof Error &&
+        "code" in error &&
+        error.code === "ENOENT"
+      ))
+        throw error;
+    }
+  }
+  return new Response(null, { status: 404, headers: privateHeaders });
 }

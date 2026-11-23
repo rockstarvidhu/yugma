@@ -1,84 +1,74 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { BrandLogo } from "@/components/brand/BrandLogo";
-import {
-  storefrontNavigation,
-  storefrontRoutes,
-} from "@/lib/storefront-routes";
+import { storefrontRoutes } from "@/lib/storefront-routes";
 
-export function StorefrontHeader() {
-  const [open, setOpen] = useState(false);
-  const button = useRef<HTMLButtonElement>(null);
-  const header = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-        button.current?.focus();
-      }
-    };
-    const outside = (event: PointerEvent) => {
-      if (!header.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const desktop = window.matchMedia("(min-width: 900px)");
-    const resize = () => {
-      if (desktop.matches) setOpen(false);
-    };
-    document.addEventListener("keydown", escape);
-    document.addEventListener("pointerdown", outside);
-    desktop.addEventListener("change", resize);
-    return () => {
-      document.removeEventListener("keydown", escape);
-      document.removeEventListener("pointerdown", outside);
-      desktop.removeEventListener("change", resize);
-    };
-  }, [open]);
+export function StorefrontHeader({
+  studioAvailable,
+}: {
+  studioAvailable: boolean;
+}) {
+  const links = [
+    { label: "Invitations", href: storefrontRoutes.collection },
+    { label: "How it works", href: storefrontRoutes.howItWorks },
+    ...(studioAvailable ? [{ label: "Studio", href: "/studio" }] : []),
+  ];
 
   return (
-    <header className="home-header" ref={header}>
-      <div className="home-header-row">
-        <Link href="/" className="home-header-logo" aria-label="YUGMA home">
-          <BrandLogo decorative tone="white" className="home-mark-light" />
-          <BrandLogo decorative tone="forest" className="home-mark-dark" />
-        </Link>
+    <header className="home-header">
+      <div className="home-shell home-header-row">
+        <a
+          href={storefrontRoutes.home}
+          className="home-header-logo"
+          aria-label="YUGMA home"
+        >
+          <BrandLogo
+            decorative
+            variant="emblem"
+            tone="white"
+            className="home-mark-light"
+          />
+          <BrandLogo
+            decorative
+            variant="emblem"
+            tone="forest"
+            className="home-mark-dark"
+          />
+        </a>
         <nav className="home-desktop-nav" aria-label="Main navigation">
-          {storefrontNavigation.slice(1).map(({ label, href }) => (
+          {links.map(({ label, href }) => (
             <a href={href} key={href}>
               {label}
             </a>
           ))}
         </nav>
-        <a className="home-header-cta" href={storefrontRoutes.collection}>
-          Skip intro
-        </a>
-        <button
-          type="button"
-          className="home-menu-toggle"
-          ref={button}
-          aria-expanded={open}
-          aria-controls="home-mobile-nav"
-          onClick={() => setOpen(!open)}
+        <details
+          className="home-menu"
+          onKeyDown={(event) => {
+            if (event.key !== "Escape" || !event.currentTarget.open) return;
+            event.currentTarget.open = false;
+            event.currentTarget.querySelector("summary")?.focus();
+          }}
         >
-          {open ? "Close menu" : "Menu"}
-          <span aria-hidden="true">{open ? "×" : "☰"}</span>
-        </button>
+          <summary>
+            Menu <span aria-hidden="true" className="home-menu-icon" />
+          </summary>
+          <nav aria-label="Mobile navigation">
+            {links.map(({ label, href }) => (
+              <a
+                href={href}
+                key={href}
+                onClick={(event) => {
+                  const menu = event.currentTarget.closest("details");
+                  if (menu) menu.open = false;
+                }}
+              >
+                {label}
+              </a>
+            ))}
+          </nav>
+        </details>
       </div>
-      <nav
-        className="home-mobile-nav"
-        id="home-mobile-nav"
-        aria-label="Mobile navigation"
-        hidden={!open}
-      >
-        {storefrontNavigation.map(({ label, href }) => (
-          <a href={href} key={href} onClick={() => setOpen(false)}>
-            {label}
-          </a>
-        ))}
-      </nav>
     </header>
   );
 }

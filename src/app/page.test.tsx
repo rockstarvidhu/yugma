@@ -7,8 +7,14 @@ import { BrandLogo } from "@/components/brand/BrandLogo";
 import { Button } from "@/components/ui/Button";
 
 vi.mock("next/font/google", () => ({
-  Manrope: () => ({ variable: "mock-manrope" }),
-  Instrument_Serif: () => ({ variable: "mock-instrument" }),
+  Inter_Tight: () => ({ variable: "mock-inter-tight" }),
+}));
+
+vi.mock("@/lib/auth/service", () => ({
+  canCreatePrivateDraft: () => false,
+}));
+vi.mock("@/lib/checkout/gateway", () => ({
+  getRazorpayTestConfig: () => null,
 }));
 
 beforeEach(() => {
@@ -31,16 +37,22 @@ describe("YUGMA brand foundations", () => {
     expect(
       screen.getByRole("heading", {
         level: 1,
-        name: "Some moments deserve more.",
+        name: "Cinematic digital wedding invitations",
       }),
     ).toBeInTheDocument();
+    const header = screen.getByRole("banner");
+    const mark = within(header).getByRole("link", { name: "YUGMA home" });
     expect(
-      screen.getAllByRole("img", { name: "YUGMA home" })[0],
-    ).toHaveAttribute("src", "/brand/yugma-wordmark-forest.svg");
+      mark.querySelector('img[src="/brand/yugma-emblem-white.svg"]'),
+    ).toBeInTheDocument();
+    expect(mark.querySelector('img[src*="wordmark"]')).toBeNull();
     expect(
-      screen.getByText(
-        "Digital wedding invitations for the story only you can tell.",
+      document.querySelector(
+        '.home-hero img[src="/brand/yugma-wordmark-white.svg"]',
       ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("An invitation worth experiencing."),
     ).toBeInTheDocument();
     expect(metadata.openGraph).toMatchObject({
       images: [{ url: "/brand/yugma-og-brand.png", width: 1200, height: 630 }],

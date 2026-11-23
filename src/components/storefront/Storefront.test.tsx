@@ -6,9 +6,9 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getStorefrontCollection } from "@/lib/storefront-catalogue";
+import { AFTERGLOW_PRICE_PAISE } from "@/lib/checkout/contract";
+import { getStorefrontCatalogue } from "@/lib/storefront-catalogue";
 import { Storefront } from "./Storefront";
-import { TemplateCarousel } from "./TemplateCarousel";
 
 beforeEach(() => {
   vi.stubGlobal("matchMedia", () => ({
@@ -16,137 +16,124 @@ beforeEach(() => {
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
   }));
-  vi.stubGlobal("scrollTo", vi.fn());
-});
-afterEach(() => {
-  cleanup();
-  vi.unstubAllGlobals();
-  vi.unstubAllEnvs();
 });
 
-describe("YUGMA homepage scroll and collection", () => {
-  it("keeps the headline and working destinations in static markup", () => {
+afterEach(() => {
+  cleanup();
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+});
+
+describe("YUGMA editorial storefront", () => {
+  it("keeps all five scenes and working destinations in the static markup", () => {
     const { container } = render(<Storefront />);
     expect(
       screen.getByRole("heading", {
         level: 1,
-        name: "Some moments deserve more.",
+        name: "Cinematic digital wedding invitations",
       }),
     ).toBeVisible();
     expect(
+      screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent),
+    ).toEqual([
+      "More than where and when.",
+      "Afterglow",
+      "How it works",
+      "Give your story a beginning.",
+    ]);
+    expect(
       screen.getByRole("navigation", { name: "Main navigation" }),
-    ).toBeVisible();
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("navigation", { name: "Footer navigation" }),
-    ).toBeVisible();
+    ).toBeInTheDocument();
     for (const link of container.querySelectorAll<HTMLAnchorElement>(
       "a[href]",
     )) {
-      const url = new URL(link.href, "http://localhost");
+      const url = new URL(link.href);
       if (url.origin !== window.location.origin) {
         expect(url.href).toBe("https://github.com/rockstarvidhu/yugma/issues");
-        continue;
-      }
-      if (url.hash && url.pathname === "/")
+      } else if (url.hash && url.pathname === "/") {
         expect(container.querySelector(url.hash)).not.toBeNull();
-      expect([
-        "/",
-        "/templates",
-        "/demo/heirloom",
-        "/demo/afterglow",
-      ]).toContain(url.pathname);
+      } else {
+        expect(["/templates", "/demo/afterglow"]).toContain(url.pathname);
+      }
     }
   });
 
-  it("features two previews of the registered Afterglow design", () => {
+  it("offers a single accessible sentence with five stable motion targets", () => {
+    const { container } = render(<Storefront />);
+    expect(
+      screen.getByRole("heading", { name: "More than where and when." }),
+    ).toBeVisible();
+    expect(
+      Array.from(
+        container.querySelectorAll("[data-home-word]"),
+        (word) => word.textContent,
+      ),
+    ).toEqual(["More", "than", "where", "and", "when."]);
+  });
+
+  it("features one registered design and sends visitors to the real personalized and sample previews", () => {
     render(<Storefront />);
-    const gallery = within(
-      screen.getByRole("region", { name: "The YUGMA Collection" }),
-    );
-    expect(gallery.getByRole("heading", { name: "Afterglow" })).toBeVisible();
-    const track = within(
-      gallery.getByRole("list", { name: "Invitation templates" }),
-    );
-    const slides = track.getAllByRole("listitem");
-    expect(slides.map((slide) => slide.dataset.position)).toEqual(["0", "1"]);
-    expect(gallery.getAllByRole("img")).toHaveLength(2);
     expect(
-      gallery.getByRole("link", { name: "View catalogue" }),
-    ).toHaveAttribute("href", "/templates");
-    expect(gallery.getAllByRole("link")).toHaveLength(2);
+      getStorefrontCatalogue().map(({ templateId }) => templateId),
+    ).toEqual(["afterglow"]);
+    const featured = within(screen.getByRole("region", { name: "Afterglow" }));
     expect(
-      gallery.getByRole("link", { name: "Preview Experience: Afterglow" }),
+      featured.getByRole("img", { name: /sample cover.*Demo watermark/ }),
+    ).toHaveAttribute("loading", "lazy");
+    expect(
+      featured.getByRole("link", { name: "View Live Demo" }),
     ).toHaveAttribute("href", "/demo/afterglow");
-    expect(
-      gallery.getByRole("button", { name: "Next template" }),
-    ).toBeVisible();
-    expect(getStorefrontCollection({ get: () => undefined })).toEqual([]);
+    expect(featured.getByRole("link", { name: "Personalize" })).toHaveAttribute(
+      "href",
+      "/demo/afterglow?personalize=1#preview-editor",
+    );
+    expect(featured.queryByText(/₹|test mode/i)).toBeNull();
+    expect(featured.queryByRole("button")).toBeNull();
+    expect(getStorefrontCatalogue({ get: () => undefined })).toEqual([]);
   });
 
-  it("rotates with arrows or keyboard and lets visitors select a side card", () => {
-    render(<TemplateCarousel collection={getStorefrontCollection()} />);
-    const track = screen.getByRole("list", { name: "Invitation templates" });
-    fireEvent.click(screen.getByRole("button", { name: "Next template" }));
+  it("labels the canonical configured price as Test Mode when enabled", () => {
+    render(<Storefront showTestPrice studioAvailable />);
+    const expected = new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      minimumFractionDigits: 0,
+    }).format(AFTERGLOW_PRICE_PAISE / 100);
+    expect(screen.getByText(expected + " one-time in Test Mode")).toBeVisible();
     expect(
-      screen.getByRole("heading", { name: "Afterglow celebrations" }),
-    ).toBeVisible();
-    expect(
-      screen.getByRole("link", {
-        name: "Preview Experience: Afterglow celebrations",
-      }),
-    ).toHaveAttribute("href", "/demo/afterglow#celebration");
-    fireEvent.keyDown(track, { key: "ArrowLeft" });
-    expect(screen.getByRole("heading", { name: "Afterglow" })).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "Previous template" }));
-    expect(
-      screen.getByRole("heading", { name: "Afterglow celebrations" }),
-    ).toBeVisible();
-    const cover = screen.getByRole("button", { name: "Select Afterglow" });
-    fireEvent.click(cover);
-    expect(cover).toHaveAttribute("aria-pressed", "true");
+      within(
+        screen.getByRole("navigation", { name: "Main navigation" }),
+      ).getByRole("link", { name: "Studio" }),
+    ).toHaveAttribute("href", "/studio");
+    expect(screen.queryByRole("link", { name: /buy|checkout/i })).toBeNull();
   });
 
-  it("moves focus to the collection when skipping the intro", () => {
-    render(<Storefront />);
-    fireEvent.click(screen.getByRole("link", { name: "Skip intro" }));
-    expect(
-      screen.getByRole("region", { name: "The YUGMA Collection" }),
-    ).toHaveFocus();
-    expect(window.scrollTo).toHaveBeenCalled();
-    history.replaceState(null, "", "/");
-  });
-
-  it("opens and closes the mobile disclosure with Escape and returns focus", () => {
-    render(<Storefront />);
-    const toggle = screen.getByRole("button", { name: "Menu" });
-    fireEvent.click(toggle);
+  it("uses a native mobile disclosure and closes it with Escape", () => {
+    const { container } = render(<Storefront />);
+    const details = container.querySelector("details")!;
+    const toggle = details.querySelector("summary")!;
+    details.open = true;
     const nav = screen.getByRole("navigation", { name: "Mobile navigation" });
-    expect(toggle).toHaveAttribute("aria-controls", nav.id);
-    within(nav).getByRole("link", { name: "Home" }).focus();
-    fireEvent.keyDown(document, { key: "Escape" });
+    const link = within(nav).getByRole("link", { name: "Invitations" });
+    link.focus();
+    fireEvent.keyDown(link, { key: "Escape" });
     expect(toggle).toHaveFocus();
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(details.open).toBe(false);
   });
 
-  it("serves one eager hero image with distinct landscape and portrait sources", () => {
+  it("serves a single high-priority hero request with independent crops", () => {
     const { container } = render(<Storefront photographic />);
-    const picture = container.querySelector(".home-moment-media picture");
-    const landscape = picture?.querySelector("source");
+    const picture = container.querySelector(".home-hero-art");
+    const landscape = picture?.querySelector("source[sizes]");
     const portrait = picture?.querySelector("img");
-    expect(landscape).toHaveAttribute("media", "(min-width: 900px)");
-    expect(landscape).toHaveAttribute(
-      "sizes",
-      "(max-aspect-ratio: 16/9) 177.78vh, 100vw",
-    );
     expect(landscape?.getAttribute("srcset")).toMatch(
-      /hero-desktop-1280x720\.webp 1280w.*hero-desktop-1600x900\.webp 1600w.*hero-desktop-1920x1080\.webp 1920w/,
-    );
-    expect(portrait).toHaveAttribute(
-      "sizes",
-      "(max-aspect-ratio: 9/16) 56.25vh, 100vw",
+      /hero-desktop-960\.webp 960w.*hero-desktop-1440\.webp 1440w.*hero-desktop-1920\.webp 1920w/,
     );
     expect(portrait?.getAttribute("srcset")).toMatch(
-      /hero-mobile-540x960\.webp 540w.*hero-mobile-810x1440\.webp 810w.*hero-mobile-1080x1920\.webp 1080w/,
+      /hero-mobile-480\.webp 480w.*hero-mobile-720\.webp 720w.*hero-mobile-1080\.webp 1080w/,
     );
     expect(portrait).toHaveAttribute("fetchpriority", "high");
     expect(portrait).toHaveAttribute("loading", "eager");
@@ -154,11 +141,11 @@ describe("YUGMA homepage scroll and collection", () => {
     expect(picture?.querySelectorAll("img")).toHaveLength(1);
   });
 
-  it("renders the branded fallback and its heading in production", () => {
-    vi.stubEnv("NODE_ENV", "production");
+  it("uses a branded homepage unless local image review is explicitly enabled", () => {
+    vi.stubEnv("YUGMA_STOREFRONT_PHOTO_PREVIEW", "");
     const { container } = render(<Storefront />);
     expect(container.querySelector("[data-hero-art=brand]")).not.toBeNull();
-    expect(container.querySelector(".home-moment-photo")).toBeNull();
+    expect(container.querySelector(".home-hero-art")).toBeNull();
     expect(screen.getByRole("heading", { level: 1 })).toBeVisible();
   });
 });

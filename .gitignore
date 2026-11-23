@@ -47,3 +47,7 @@ next-env.d.ts
 # Local Chrome recordings and screenshots.
 /artifacts/home-collection/hero-v3/
 /artifacts/home-collection/final-review/
+
+# Candidate photography and rendered evidence are for local editorial review.
+/assets/storefront-hero-review/
+/artifacts/storefront-editorial/private/
