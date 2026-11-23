@@ -1,0 +1,19 @@
+Developer A checkout verification
+Base: df3850f09b339327667632ada0328ca381d6a050
+Implementation: 0e71037fdbfa3ee29de3d4461090fc4665db6e91
+
+PASS npm ci
+PASS npm run lint
+PASS npm run typecheck
+PASS npm run test (20 test files, 285 tests)
+PASS npm run format:check (clean LF checkout)
+PASS npm run build
+PASS git diff --check origin/main...HEAD
+PASS developer A changes leave src/app/api, src/lib/checkout, supabase and the dependency manifests identical to main
+
+PASS Browser smoke: anonymous order rejected, exact sign-in return URL and saved draft summary
+PASS Browser smoke: staging terms, refunds/delivery, privacy and support links
+PASS Browser smoke: client amount rejected, fixture modal matched ₹899 and server order ID
+PASS Browser smoke: cancellation, failure, retry using the same order and saved draft reload
+PASS Browser smoke: callback showed processing until capture and recovered verification in the same tab
+PASS Browser smoke: verified test status persisted after reopening, no share slug

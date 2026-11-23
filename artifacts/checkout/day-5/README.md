@@ -1,0 +1,16 @@
+# Day 05 Developer A checkout evidence
+
+The browser smoke used a production Next.js build, disposable PostgreSQL, a local Supabase-compatible Auth and REST fixture, and a simulated Razorpay API and checkout modal. The fixture used fictional invitation details. The merchant's saved Razorpay Test Mode key pair returned HTTP 401 in a separate genuine Orders API probe.
+
+The fixture opened `/checkout/e5100000-0000-4000-8000-000000000001`. The summary and the modal both displayed ₹899 INR for the same saved order.
+
+- [Desktop purchase summary](checkout-summary-1440.png)
+- [Simulated Razorpay modal](checkout-modal-fixture-1440.png)
+- [Cancellation with a saved draft](checkout-cancelled-1440.png)
+- [Processing on desktop](checkout-processing-1440.png)
+- [Processing after a reload on mobile](checkout-processing-390.png)
+- [Server-verified test payment on mobile](checkout-verified-390.png)
+- [Three-minute walkthrough](checkout-walkthrough.webm)
+- [Browser assertions](browser-results.json) and [local test output](verification.txt)
+
+The checkout survived sign-in, cancellation, failure, reload, and browser-tab closure. A callback showed processing while the payment was authorized. Retrying after provider capture showed verification. PostgreSQL reported a private draft with no share slug after the test capture.
