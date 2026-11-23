@@ -12,6 +12,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CheckoutConfirmation } from "@/lib/checkout/contract";
 import { CheckoutButton } from "./CheckoutButton";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
+}));
+
 vi.mock("next/script", () => ({
   default: ({ onReady, onError }: ComponentProps<typeof Script>) => (
     <>
@@ -27,7 +31,6 @@ const order = {
   order_id: "order_Fixture123",
   amount: 98525,
   currency: "INR",
-  key_id: keyId,
 };
 const verifiedCopy =
   "Test payment verified. No money was charged. Your invitation is still private.";
@@ -46,6 +49,7 @@ const open = vi.fn();
 
 beforeEach(() => {
   vi.resetAllMocks();
+  sessionStorage.clear();
   vi.stubGlobal("fetch", fetcher);
   vi.stubGlobal(
     "Razorpay",
@@ -73,7 +77,7 @@ function renderCheckout() {
       amount={order.amount}
       currency={order.currency}
       initialState="ready"
-      canPay
+      keyId={keyId}
     />,
   );
   const pay = screen.getByRole("button", { name: "Open Razorpay Test Mode" });
@@ -141,7 +145,7 @@ describe("Studio Test Mode checkout", () => {
     fetcher
       .mockResolvedValueOnce(Response.json(order))
       .mockResolvedValueOnce(
-        Response.json({ state: "processing" }, { status: 202 }),
+        Response.json({ error: "Awaiting capture." }, { status: 409 }),
       )
       .mockResolvedValueOnce(Response.json({ success: true }));
     fireEvent.click(renderCheckout());
@@ -161,29 +165,34 @@ describe("Studio Test Mode checkout", () => {
     ]);
   });
 
-  it("restores processing on reload and shows verification after webhook-backed status", async () => {
-    fetcher.mockResolvedValueOnce(Response.json({ state: "verified" }));
+  it("retries a pending confirmation from the same browser tab after reload", async () => {
+    sessionStorage.setItem(
+      `yugma:checkout:${draftId}`,
+      JSON.stringify(confirmation),
+    );
+    fetcher.mockResolvedValueOnce(Response.json({ success: true }));
     render(
       <CheckoutButton
         draftId={draftId}
         amount={order.amount}
         currency={order.currency}
-        initialState="processing"
-        canPay
+        initialState="pending"
+        keyId={keyId}
       />,
     );
-    expect(screen.getByRole("status")).toHaveTextContent("Processing payment.");
-    expect(
-      screen.queryByRole("button", { name: "Open Razorpay Test Mode" }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Checkout started.");
     fireEvent.click(
       screen.getByRole("button", { name: "Check payment status" }),
     );
     expect(await screen.findByText(verifiedCopy)).toBeVisible();
     expect(fetcher).toHaveBeenCalledWith(
-      `/api/checkout/${draftId}`,
-      expect.objectContaining({ cache: "no-store" }),
+      "/api/verify-payment",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify(confirmation),
+      }),
     );
+    expect(sessionStorage.getItem(`yugma:checkout:${draftId}`)).toBeNull();
   });
 
   it("offers sign-in with a return to the same checkout when the session expires", async () => {
@@ -197,6 +206,22 @@ describe("Studio Test Mode checkout", () => {
       `/sign-in?next=%2Fcheckout%2F${draftId}`,
     );
     expect(open).not.toHaveBeenCalled();
+  });
+
+  it("clears a rejected callback without showing a verified payment", async () => {
+    fetcher
+      .mockResolvedValueOnce(Response.json(order))
+      .mockResolvedValueOnce(
+        Response.json({ error: "Invalid signature." }, { status: 400 }),
+      );
+    fireEvent.click(renderCheckout());
+    await waitFor(() => expect(open).toHaveBeenCalledOnce());
+    act(() => options.handler(confirmation));
+    expect(
+      await screen.findByText(/couldn’t verify the checkout response/i),
+    ).toBeVisible();
+    expect(screen.queryByText(verifiedCopy)).not.toBeInTheDocument();
+    expect(sessionStorage.getItem(`yugma:checkout:${draftId}`)).toBeNull();
   });
 
   it("asks for a refreshed summary if the order quote changed", async () => {

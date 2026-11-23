@@ -7,7 +7,6 @@ import { getServerAuth, requireStudioUser } from "@/lib/auth/server";
 import { canCreatePrivateDraft, createServiceClient } from "@/lib/auth/service";
 import { getRazorpayTestConfig } from "@/lib/checkout/gateway";
 import {
-  checkoutState,
   findTestOrder,
   loadAfterglowCheckoutDraft,
 } from "@/lib/checkout/store";
@@ -49,12 +48,12 @@ export default async function CheckoutPage({
         </Link>
       </StudioShell>
     );
-  const [draft, quote] = loaded;
+  const [draft, eligible] = loaded;
   if (!draft) notFound();
   const template = getStorefrontCatalogue().find(
     ({ templateId }) => templateId === draft.templateKey,
   );
-  if (!quote || !template)
+  if (!eligible || !template)
     return (
       <StudioShell title="Invitation checkout" back={edit}>
         <p>This invitation is currently unavailable for test checkout.</p>
@@ -66,14 +65,21 @@ export default async function CheckoutPage({
         .then((order) => ({ order }))
         .catch(() => null)
     : null;
-  const canPay = Boolean(getRazorpayTestConfig());
-  const amount = payment?.order?.amount_paise ?? quote.amount;
-  const price = new Intl.NumberFormat("en-IN", {
+  const keyId = getRazorpayTestConfig()?.keyId;
+  const amount = payment?.order?.amount_paise ?? template.price.amountMinor;
+  const currency = payment?.order?.currency ?? template.price.currency;
+  const initialState =
+    payment?.order?.status === "test_verified"
+      ? "verified"
+      : payment?.order
+        ? "pending"
+        : "ready";
+  const priceFormat = new Intl.NumberFormat("en-IN", {
     style: "currency",
-    currency: quote.currency,
-    minimumFractionDigits: amount % 100 === 0 ? 0 : 2,
+    currency,
+    minimumFractionDigits: amount && amount % 100 ? 2 : 0,
     maximumFractionDigits: 2,
-  }).format(amount / 100);
+  });
   const names = [
     draft.data.couple?.partnerOne,
     draft.data.couple?.partnerTwo,
@@ -118,7 +124,11 @@ export default async function CheckoutPage({
           aria-labelledby="checkout-payment"
         >
           <h2 id="checkout-payment">Order total</h2>
-          <p className="font-editorial checkout-price">{price}</p>
+          {amount !== null && (
+            <p className="font-editorial checkout-price">
+              {priceFormat.format(amount / 100)}
+            </p>
+          )}
           <p>
             One-time test payment in INR. Use Razorpay test details. No money
             will be charged.
@@ -151,13 +161,14 @@ export default async function CheckoutPage({
               </Link>
             </nav>
           )}
-          {payment && (canPay || payment.order) ? (
+          {payment && amount !== null && (keyId || payment.order) ? (
             <CheckoutButton
+              key={`${id}:${initialState}:${amount}`}
               draftId={id}
               amount={amount}
-              currency={quote.currency}
-              initialState={checkoutState(payment.order)}
-              canPay={canPay}
+              currency={currency}
+              initialState={initialState}
+              keyId={keyId}
             />
           ) : (
             <p role="status">

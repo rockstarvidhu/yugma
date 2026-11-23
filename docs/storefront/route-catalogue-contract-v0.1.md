@@ -8,7 +8,7 @@ Date: 19 November 2026. Frontend owner: Developer A. Backend/review counterpart:
 
 The Day 2 owner decision supersedes the roadmap’s Heirloom product name and the proposed Day 1 values below. Afterglow is the single registry ID and catalogue offering. `/demo/heirloom` remains an alias of the same watermarked sample. The homepage carousel uses two views of that invitation, and `/templates` displays one catalogue entry with sample and personalization links.
 
-The Afterglow Test Mode catalogue starts at 89,900 INR paise. The storefront labels this amount as a test price. Checkout reads the active Supabase catalogue for new orders and the stored price for resumed orders. The amount is for development and does not establish final commercial pricing. Private draft creation and editing work independently of Razorpay settings. [Test checkout contract](../platform/razorpay-test-checkout.md)
+The existing server checkout sets the Afterglow Test Mode amount to 89,900 INR paise. The storefront displays that same amount with a Test Mode label. Afterglow remains a demo in the database, eligible for private drafts. Test verification grants no publishing entitlement. The amount is for development and does not establish final commercial pricing. Private draft creation requires Supabase configuration and works independently of Razorpay settings.
 
 The footer links to the project’s public GitHub Issues page for general questions. Public customer policies and a dedicated support channel remain release work.
 
@@ -24,7 +24,7 @@ The footer links to the project’s public GitHub Issues page for general questi
 | `/demo/[slug]`       | Two concrete routes exist   | Use the existing `/demo/afterglow` and `/demo/heirloom`; no generic dynamic route is introduced |
 | `/create/[template]` | Proposed/reserved           | Creation destination remains null; no public CTA                                                |
 | `/studio/[id]`       | Future private editor       | Developer B owns authorization; no route or link today                                          |
-| `/checkout/[id]`     | Private test checkout       | Saved draft summary, server-priced Razorpay launch and verified payment status                  |
+| `/checkout/[id]`     | Private test checkout       | Saved draft summary, Razorpay Test Mode launch and server-verified status                       |
 | `/i/[slug]`          | Future published invitation | No publication capability or link today                                                         |
 
 Do not infer a public URL from a template ID. Future destination activation requires an actual implemented route and the corresponding server-side authorization. Demo watermarks and client state never authorize purchases or publishing.
