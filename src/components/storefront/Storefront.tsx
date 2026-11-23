@@ -21,22 +21,14 @@ const steps = [
   },
 ] as const;
 
-const priceFormat = new Intl.NumberFormat("en-IN", {
-  style: "currency",
-  currency: "INR",
-  minimumFractionDigits: 0,
-});
-
 export function Storefront({
   photographic = storefrontPhotoReviewEnabled(),
   fontClass = "",
   studioAvailable = false,
-  showTestPrice = false,
 }: {
   photographic?: boolean;
   fontClass?: string;
   studioAvailable?: boolean;
-  showTestPrice?: boolean;
 } = {}) {
   const afterglow = getStorefrontCatalogue().find(
     ({ templateId }) => templateId === "afterglow",
@@ -84,12 +76,6 @@ export function Storefront({
                 <p className="home-kicker">The YUGMA Collection</p>
                 <h2 id="collection-heading">{afterglow.name}</h2>
                 <p>{afterglow.description}</p>
-                {showTestPrice && afterglow.price.amountMinor !== null && (
-                  <p className="home-test-price">
-                    {priceFormat.format(afterglow.price.amountMinor / 100)}{" "}
-                    one-time in Test Mode
-                  </p>
-                )}
                 <div className="home-actions">
                   <a
                     className="home-button home-button-forest"

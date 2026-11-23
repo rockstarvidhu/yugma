@@ -6,7 +6,6 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AFTERGLOW_PRICE_PAISE } from "@/lib/checkout/contract";
 import { getStorefrontCatalogue } from "@/lib/storefront-catalogue";
 import { Storefront } from "./Storefront";
 
@@ -95,14 +94,8 @@ describe("YUGMA editorial storefront", () => {
     expect(getStorefrontCatalogue({ get: () => undefined })).toEqual([]);
   });
 
-  it("labels the canonical configured price as Test Mode when enabled", () => {
-    render(<Storefront showTestPrice studioAvailable />);
-    const expected = new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      minimumFractionDigits: 0,
-    }).format(AFTERGLOW_PRICE_PAISE / 100);
-    expect(screen.getByText(expected + " one-time in Test Mode")).toBeVisible();
+  it("adds the Studio link when private drafts are available", () => {
+    render(<Storefront studioAvailable />);
     expect(
       within(
         screen.getByRole("navigation", { name: "Main navigation" }),

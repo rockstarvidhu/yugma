@@ -249,7 +249,7 @@ async function verifyViewport(width, height) {
   assert.match(top.font, /Inter Tight/);
   if (browserEngine === "chromium") assert(top.fontLoaded);
   assert.equal(await page.getByRole("heading", { name: quote }).count(), 1);
-  assert.equal(await page.locator(".home-test-price").count(), 0);
+  assert.equal(await page.getByText(/₹|one-time in Test Mode/i).count(), 0);
   assert.equal(
     await page.getByRole("link", { name: /buy|pay|publish/i }).count(),
     0,

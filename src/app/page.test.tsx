@@ -5,16 +5,18 @@ import BrandPreview from "./dev/brand/page";
 import TemplatesPage, { metadata as catalogueMetadata } from "./templates/page";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { Button } from "@/components/ui/Button";
+import { canCreatePrivateDraft } from "@/lib/auth/service";
+import { getRazorpayTestConfig } from "@/lib/checkout/gateway";
 
 vi.mock("next/font/google", () => ({
   Inter_Tight: () => ({ variable: "mock-inter-tight" }),
 }));
 
 vi.mock("@/lib/auth/service", () => ({
-  canCreatePrivateDraft: () => false,
+  canCreatePrivateDraft: vi.fn(() => false),
 }));
 vi.mock("@/lib/checkout/gateway", () => ({
-  getRazorpayTestConfig: () => null,
+  getRazorpayTestConfig: vi.fn(() => null),
 }));
 
 beforeEach(() => {
@@ -27,6 +29,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.resetAllMocks();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });
@@ -70,6 +73,24 @@ describe("YUGMA brand foundations", () => {
       "src",
       "/brand/yugma-emblem-sand.svg",
     );
+  });
+  it("keeps the homepage price-free with Studio and Razorpay Test Mode configured", () => {
+    vi.mocked(canCreatePrivateDraft).mockReturnValue(true);
+    vi.mocked(getRazorpayTestConfig).mockReturnValue({
+      keyId: "rzp_test_Fixture",
+      keySecret: "fixture-test-signing-secret",
+    });
+
+    render(<Home />);
+    const navigation = screen.getByRole("navigation", {
+      name: "Main navigation",
+    });
+    expect(
+      within(navigation).getByRole("link", { name: "Studio" }),
+    ).toHaveAttribute("href", "/studio");
+    expect(
+      screen.queryByText(/₹|one-time in Test Mode/i),
+    ).not.toBeInTheDocument();
   });
   it("lists the registered design with separate sample and personalization links", () => {
     render(<TemplatesPage />);

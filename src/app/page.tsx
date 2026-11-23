@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Inter_Tight } from "next/font/google";
 import { Storefront } from "@/components/storefront/Storefront";
 import { canCreatePrivateDraft } from "@/lib/auth/service";
-import { getRazorpayTestConfig } from "@/lib/checkout/gateway";
 
 const interTight = Inter_Tight({
   subsets: ["latin"],
@@ -40,7 +39,6 @@ export default function Home() {
     <Storefront
       fontClass={interTight.variable}
       studioAvailable={studioAvailable}
-      showTestPrice={studioAvailable && Boolean(getRazorpayTestConfig())}
     />
   );
 }

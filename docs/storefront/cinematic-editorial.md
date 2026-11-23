@@ -25,7 +25,7 @@ The photo kit documents an underlying source of roughly 1123 × 632 pixels. The 
 - `/demo/afterglow` is the live registered sample. The homepage features two responsive crops from a production Chrome capture of that route, with the actual demo mark preserved. `--capture-afterglow` in the browser script regenerates these stills from the renderer.
 - `/demo/afterglow?personalize=1#preview-editor` opens the existing browser preview editor. `/demo/heirloom` remains a sample alias for the same design.
 - `/#templates` opens the featured design, `/templates` is the closing CTA, and `/studio` is linked when private draft configuration is present. The footer links to the existing GitHub issues contact.
-- Afterglow is the only registered design. The canonical checkout amount is ₹899 in Razorpay Test Mode. The homepage shows the amount with its Test Mode label only when the private Studio and test gateway configuration are present at build time. The public default offers preview actions and keeps checkout and publication in their existing flows.
+- Afterglow is the only registered design. The homepage offers demo and personalization links. Private checkout uses the active Supabase catalogue price for new orders and the saved order price for resumed checkouts.
 
 ## Browser verification
 
