@@ -79,16 +79,19 @@ export function checkoutState(
   return order ? states[order.status] : "ready";
 }
 
+export type TestOrder = z.output<typeof testOrderSchema>;
+
 export async function findTestOrder(
   db: ServiceClient,
-  ownerId: string,
+  ownerId: string | null,
   match: { draftId: string } | { gatewayOrderId: string },
 ) {
+  if (ownerId === null && !("gatewayOrderId" in match)) return null;
   const query = db
     .from("orders")
     .select(orderColumns)
-    .eq("owner_id", ownerId)
     .in("status", orderStatus.options);
+  if (ownerId !== null) query.eq("owner_id", ownerId);
   const { data, error } = await (
     "draftId" in match
       ? query.eq("invitation_id", match.draftId)
@@ -96,6 +99,36 @@ export async function findTestOrder(
   ).maybeSingle();
   if (error) throw error;
   return data ? testOrderSchema.parse(data) : null;
+}
+
+export async function recordedWebhook(
+  db: ServiceClient,
+  eventId: string,
+  digest: string,
+) {
+  const { data, error } = await db
+    .from("payment_events")
+    .select("gateway_event_id")
+    .or("gateway_event_id.eq." + eventId + ",request_sha256.eq." + digest)
+    .not("processed_at", "is", null)
+    .limit(1);
+  if (error) throw error;
+  return (
+    z.array(z.object({ gateway_event_id: z.string() })).parse(data).length > 0
+  );
+}
+
+export async function claimTestReconciliation(
+  db: ServiceClient,
+  ownerId: string,
+  orderId: string,
+) {
+  const { data, error } = await db.rpc("claim_razorpay_test_reconciliation", {
+    p_owner_id: ownerId,
+    p_id: orderId,
+  });
+  if (error) throw error;
+  return z.boolean().parse(data);
 }
 
 const reservationSchema = z.object({
@@ -152,9 +185,9 @@ export async function recordTestPayment(
     order_id: string | null;
     amount: number;
     currency: string;
-    status: "authorized" | "captured" | "failed";
+    status: "authorized" | "captured" | "failed" | "ignored";
   },
-  source: { ownerId: string } | { eventId: string },
+  source: { ownerId: string } | { eventId: string; digest: string },
 ) {
   const { data, error } = await db.rpc("record_razorpay_test_payment", {
     p_order_id: payment.order_id,
@@ -164,6 +197,7 @@ export async function recordTestPayment(
     p_status: payment.status,
     p_owner_id: "ownerId" in source ? source.ownerId : null,
     p_event_id: "eventId" in source ? source.eventId : null,
+    p_request_sha256: "digest" in source ? source.digest : null,
   });
   if (error) throw error;
   return z

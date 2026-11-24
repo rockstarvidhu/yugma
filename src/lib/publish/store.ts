@@ -87,7 +87,15 @@ export async function publishTestInvitation(
   );
   if (error) throw error;
   return z
-    .enum(["published", "missing", "unpaid", "invalid", "stale", "slug_taken"])
+    .enum([
+      "published",
+      "missing",
+      "unpaid",
+      "invalid",
+      "invalid_media",
+      "stale",
+      "slug_taken",
+    ])
     .parse(data);
 }
 
@@ -125,7 +133,10 @@ export async function loadTestPublication(slug: string) {
 export async function loadPublicInvitation(slug: string) {
   if (!shareSlugSchema.safeParse(slug).success) return null;
   const test = await loadTestPublication(slug);
-  if (test) return test;
+  if (test) {
+    const { registry_key, title, data, cover } = test;
+    return { registry_key, title, data, cover };
+  }
 
   const config = getSupabaseConfig();
   if (!config) return null;

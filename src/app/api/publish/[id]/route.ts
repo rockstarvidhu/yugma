@@ -64,6 +64,11 @@ export async function POST(
         return failure(409, "This link is already in use. Choose another.");
       case "missing":
         return failure(404, "Invitation unavailable.");
+      case "invalid_media":
+        return failure(
+          422,
+          "Choose a cover photo uploaded to this invitation or remove it before publishing.",
+        );
       case "invalid":
         return failure(400, "Review and confirm the title and link.");
       case "published": {

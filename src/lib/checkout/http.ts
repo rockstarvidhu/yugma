@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 import { z } from "zod";
 import { getVerifiedSession } from "@/lib/auth/server";
 import { createServiceClient } from "@/lib/auth/service";
@@ -9,10 +10,13 @@ import { getTestGateway, matchesHmac, matchesSignature } from "./gateway";
 import {
   attachGatewayTestOrder,
   checkoutState,
+  claimTestReconciliation,
   findTestOrder,
   loadAfterglowCheckoutDraft,
   recordTestPayment,
+  recordedWebhook,
   reserveTestOrder,
+  type TestOrder,
 } from "./store";
 
 const orderInput = z.strictObject({ draftId: draftIdSchema });
@@ -39,6 +43,55 @@ const eventPayment = z.object({
   currency: z.string().regex(/^[A-Z]{3}$/),
   status: z.enum(["authorized", "captured", "failed"]),
 });
+// Webhook entities are snapshots. Only these fields from the live provider response
+// can reach the transactional fulfilment path.
+const providerPayment = eventPayment.extend({
+  status: z.enum([
+    "created",
+    "authorized",
+    "captured",
+    "refunded",
+    "failed",
+    "cancelled",
+  ]),
+  captured: z.boolean(),
+  amount_refunded: z.number().int().nonnegative(),
+  refund_status: z.enum(["partial", "full"]).nullish(),
+});
+const orderPayments = z.object({ items: z.array(z.unknown()).max(100) });
+type ProviderPayment = z.output<typeof providerPayment>;
+
+function matchedPayment(input: unknown, order: TestOrder, expectedId?: string) {
+  const result = providerPayment.safeParse(input);
+  if (!result.success) return null;
+  const payment = result.data;
+  return (expectedId === undefined || payment.id === expectedId) &&
+    payment.order_id === order.gateway_order_id &&
+    payment.amount === order.amount_paise &&
+    payment.currency === order.currency
+    ? payment
+    : null;
+}
+
+function paymentEvidence({
+  id,
+  order_id,
+  amount,
+  currency,
+  ...payment
+}: ProviderPayment) {
+  const status =
+    payment.amount_refunded > 0 || payment.refund_status
+      ? "ignored"
+      : payment.status === "captured" && payment.captured
+        ? "captured"
+        : !payment.captured &&
+            (payment.status === "authorized" || payment.status === "failed")
+          ? payment.status
+          : "ignored";
+  return { id, order_id, amount, currency, status } as const;
+}
+
 const webhookInput = z.object({
   event: z.enum(["payment.captured", "payment.failed", "order.paid"]),
   payload: z.object({ payment: z.object({ entity: eventPayment }) }),
@@ -78,7 +131,7 @@ export function createOrder(request: Request) {
   return withCheckout(request, orderInput, async (session, { draftId }) => {
     const draft = await loadAfterglowCheckoutDraft(session, draftId);
     if (!draft) return failure(404, "Draft unavailable for checkout.");
-    const { sdk } = getTestGateway();
+    const { orders } = getTestGateway();
     const db = createServiceClient();
     let order = await findTestOrder(db, session.ownerId, { draftId });
     if (!order) {
@@ -86,14 +139,14 @@ export function createOrder(request: Request) {
       if (reservation) {
         const receipt = `test_${reservation.id.replaceAll("-", "")}`;
         const previousOrders = reservation.recovering
-          ? await sdk.orders.all({ receipt, count: 10 })
+          ? await orders.all({ receipt, count: 10 })
           : null;
         const recovered = previousOrders?.items.find(
           (item) => item.receipt === receipt,
         );
         const created =
           recovered ??
-          (await sdk.orders.create({
+          (await orders.create({
             amount: reservation.amount_paise,
             currency: reservation.currency,
             receipt,
@@ -132,7 +185,7 @@ export function createOrder(request: Request) {
 
 export function verifyPayment(request: Request) {
   return withCheckout(request, signatureInput, async ({ ownerId }, input) => {
-    const { sdk, keySecret } = getTestGateway();
+    const { fetchPayment, keySecret } = getTestGateway();
     const db = createServiceClient();
     const order = await findTestOrder(db, ownerId, {
       gatewayOrderId: input.razorpay_order_id,
@@ -154,32 +207,17 @@ export function verifyPayment(request: Request) {
         ? respond({ success: true })
         : failure(400, "This order has a different verified payment.");
 
-    const payment = await sdk.payments.fetch(paymentId);
-    if (
-      payment.id !== paymentId ||
-      payment.order_id !== order.gateway_order_id ||
-      Number(payment.amount) !== order.amount_paise ||
-      payment.currency !== order.currency
-    ) {
-      return failure(400, "Payment details do not match this order.");
-    }
-    if (
-      payment.status !== "captured" &&
-      payment.status !== "authorized" &&
-      payment.status !== "failed"
-    )
-      return respond({ state: "processing" }, 409);
-    const state = await recordTestPayment(
-      db,
-      {
-        id: paymentId,
-        order_id: order.gateway_order_id,
-        amount: order.amount_paise,
-        currency: order.currency,
-        status: payment.status,
-      },
-      { ownerId },
+    const payment = matchedPayment(
+      await fetchPayment(paymentId),
+      order,
+      paymentId,
     );
+    if (!payment)
+      return failure(400, "Payment details do not match this order.");
+    const evidence = paymentEvidence(payment);
+    if (evidence.status === "ignored")
+      return respond({ state: "processing" }, 409);
+    const state = await recordTestPayment(db, evidence, { ownerId });
     if (state === "verified") return respond({ success: true });
     if (state === "failed") return respond({ state });
     if (state === "processing") return respond({ state }, 409);
@@ -193,12 +231,42 @@ export async function getCheckoutStatus(draftId: string) {
     if (!session) return failure(401, "Sign in to use checkout.");
     if (!draftIdSchema.safeParse(draftId).success)
       return failure(404, "Draft unavailable for checkout.");
-    const order = await findTestOrder(createServiceClient(), session.ownerId, {
-      draftId,
-    });
+    const db = createServiceClient();
+    const order = await findTestOrder(db, session.ownerId, { draftId });
     if (!order && !(await loadAfterglowCheckoutDraft(session, draftId)))
       return failure(404, "Draft unavailable for checkout.");
-    return respond({ state: checkoutState(order) });
+    const current = checkoutState(order);
+    if (!order || current === "verified") return respond({ state: current });
+
+    if (!(await claimTestReconciliation(db, session.ownerId, order.id)))
+      return respond({ state: current });
+
+    try {
+      const result = orderPayments.parse(
+        await getTestGateway().fetchOrderPayments(order.gateway_order_id),
+      );
+      const evidence = result.items
+        .map((item) => matchedPayment(item, order))
+        .flatMap((payment) => (payment ? [paymentEvidence(payment)] : []));
+      const candidate =
+        evidence.find((item) => item.status === "captured") ??
+        evidence.find((item) => item.status === "authorized") ??
+        evidence.find((item) => item.status === "failed");
+      if (candidate) {
+        const state = await recordTestPayment(db, candidate, {
+          ownerId: session.ownerId,
+        });
+        if (
+          state === "verified" ||
+          state === "processing" ||
+          state === "failed"
+        )
+          return respond({ state });
+      }
+    } catch {
+      // A provider timeout must never unlock anything or erase the saved order state.
+    }
+    return respond({ state: current });
   } catch {
     return failure(500, "Couldn’t check payment status. Try again.");
   }
@@ -230,8 +298,53 @@ export async function razorpayWebhook(request: Request) {
       !(event === "order.paid" && entity.status === "captured")
     )
       return failure(400, "Invalid webhook payment status.");
-    await recordTestPayment(createServiceClient(), entity, { eventId });
-    return new Response(null, { status: 204 });
+    const db = createServiceClient();
+    const digest = createHash("sha256").update(body).digest("hex");
+    const source = { eventId, digest };
+    const acknowledged = () => new Response(null, { status: 204 });
+    if (await recordedWebhook(db, eventId, digest)) return acknowledged();
+    if (!entity.order_id) {
+      await recordTestPayment(db, { ...entity, status: "ignored" }, source);
+      return acknowledged();
+    }
+    const order = await findTestOrder(db, null, {
+      gatewayOrderId: entity.order_id,
+    });
+    if (!order)
+      return failure(
+        503,
+        "Checkout order matching is pending. Retry delivery.",
+      );
+    if (
+      entity.amount !== order.amount_paise ||
+      entity.currency !== order.currency
+    ) {
+      await recordTestPayment(db, { ...entity, status: "ignored" }, source);
+      return acknowledged();
+    }
+
+    const payment = matchedPayment(
+      providerPayment.parse(await getTestGateway().fetchPayment(entity.id)),
+      order,
+      entity.id,
+    );
+    const evidence = payment ? paymentEvidence(payment) : null;
+    if (
+      evidence &&
+      entity.status === "captured" &&
+      evidence.status !== "captured" &&
+      payment?.status !== "refunded" &&
+      !payment?.amount_refunded &&
+      !payment?.refund_status
+    ) {
+      return failure(503, "Provider capture is pending. Retry delivery.");
+    }
+    await recordTestPayment(
+      db,
+      evidence ?? { ...entity, status: "ignored" },
+      source,
+    );
+    return acknowledged();
   } catch {
     return failure(503, "Couldn’t process the webhook. Retry delivery.");
   }
