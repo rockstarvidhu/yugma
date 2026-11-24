@@ -106,6 +106,10 @@ function pngFile(signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) {
   return file;
 }
 
+function photoFields() {
+  return within(screen.getByRole("group", { name: "Cover photo (optional)" }));
+}
+
 function chooseCover(file: File) {
   fireEvent.change(screen.getByLabelText(/(?:choose|replace) cover photo/i), {
     target: { files: [file] },
@@ -138,7 +142,7 @@ describe("Studio private cover photo", () => {
     edit(fixture, true);
     expect(screen.getByText("No cover photo")).toBeVisible();
     chooseCover(pngFile());
-    const image = await screen.findByAltText("Wedding cover photograph");
+    const image = await photoFields().findByAltText("Wedding cover photograph");
     expect(image).toHaveAttribute("src", privateMediaSource(originalAsset));
     expect(image).not.toHaveAttribute("srcset");
     fireEvent.load(image);
@@ -182,13 +186,17 @@ describe("Studio private cover photo", () => {
     cleanup();
     edit(saved, true);
     expect(screen.getByLabelText("Horizontal crop position")).toHaveValue("25");
-    expect(screen.getByAltText("Tara and Neel in a garden")).toHaveStyle({
-      objectPosition: "25% 75%",
-    });
+    expect(photoFields().getByAltText("Tara and Neel in a garden")).toHaveStyle(
+      {
+        objectPosition: "25% 75%",
+      },
+    );
     fireEvent.click(button("Center photo"));
-    expect(screen.getByAltText("Tara and Neel in a garden")).toHaveStyle({
-      objectPosition: "50% 50%",
-    });
+    expect(photoFields().getByAltText("Tara and Neel in a garden")).toHaveStyle(
+      {
+        objectPosition: "50% 50%",
+      },
+    );
     fireEvent.click(button("Remove cover photo"));
     expect(screen.getByLabelText("Choose cover photo")).toHaveFocus();
     expect(screen.getByText("No cover photo")).toBeVisible();
@@ -224,17 +232,16 @@ describe("Studio private cover photo", () => {
     expect(createObjectURL).not.toHaveBeenCalled();
     expect(upload).not.toHaveBeenCalled();
     chooseCover(pngFile());
-    await screen.findByAltText("Wedding cover photograph");
+    await photoFields().findByAltText("Wedding cover photograph");
     chooseCover(pngFile([0x00, 0x01]));
     expect(await screen.findByRole("alert")).toHaveTextContent("couldn’t open");
     expect(decode).toHaveBeenCalledTimes(1);
     decode.mockRejectedValueOnce(new Error("Invalid image data"));
     chooseCover(pngFile());
     expect(await screen.findByRole("alert")).toHaveTextContent("couldn’t open");
-    expect(screen.getByAltText("Wedding cover photograph")).toHaveAttribute(
-      "src",
-      privateMediaSource(originalAsset),
-    );
+    expect(
+      photoFields().getByAltText("Wedding cover photograph"),
+    ).toHaveAttribute("src", privateMediaSource(originalAsset));
     expect(upload).toHaveBeenCalledTimes(1);
     expect(revokeObjectURL).toHaveBeenCalledWith(
       "blob:http://localhost/photo-2",
@@ -244,20 +251,18 @@ describe("Studio private cover photo", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Upload failed.",
     );
-    expect(screen.getByAltText("Wedding cover photograph")).toHaveAttribute(
-      "src",
-      privateMediaSource(originalAsset),
-    );
+    expect(
+      photoFields().getByAltText("Wedding cover photograph"),
+    ).toHaveAttribute("src", privateMediaSource(originalAsset));
     fireEvent.click(button("Retry photo upload"));
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Verification failed.",
     );
     fireEvent.click(button("Retry photo verification"));
     await waitFor(() =>
-      expect(screen.getByAltText("Wedding cover photograph")).toHaveAttribute(
-        "src",
-        privateMediaSource(replacementAsset),
-      ),
+      expect(
+        photoFields().getByAltText("Wedding cover photograph"),
+      ).toHaveAttribute("src", privateMediaSource(replacementAsset)),
     );
     expect(upload.mock.calls[3][1]).toBe(retryFile);
     expect(upload.mock.calls[3][4]).toBe(replacementAsset);
@@ -295,7 +300,7 @@ describe("Studio private cover photo", () => {
     );
     chooseCover(pngFile());
     expect(
-      await screen.findByAltText("Wedding cover photograph"),
+      await photoFields().findByAltText("Wedding cover photograph"),
     ).toHaveAttribute("src", privateMediaSource(replacementAsset));
   });
 });

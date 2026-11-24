@@ -4,7 +4,6 @@ export const storefrontRoutes = {
   catalogue: "/templates",
   howItWorks: "/#how-it-works",
   contact: "/#contact",
-  publicSupport: "https://github.com/rockstarvidhu/yugma/issues",
 } as const;
 
 export const storefrontNavigation = [

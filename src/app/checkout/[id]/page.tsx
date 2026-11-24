@@ -93,7 +93,7 @@ export default async function CheckoutPage({
   const showPolicies = process.env.CHECKOUT_STAGING_POLICIES === "true";
 
   return (
-    <StudioShell title="Invitation checkout" back={edit}>
+    <StudioShell title="Complete your purchase" back={edit}>
       <div className="checkout-layout">
         <section
           className="studio-panel checkout-summary"

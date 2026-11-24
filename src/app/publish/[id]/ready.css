@@ -1,0 +1,113 @@
+.ready-page {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: clamp(2rem, 5vh, 4rem) 1.25rem;
+  color: #fff1d9;
+  background: radial-gradient(ellipse at top right, #485337, #142418 75%);
+  font-family: var(--font-playfair), Georgia, serif;
+}
+.ready-page[data-art="review"] {
+  background: #152417 url("/dev/home-hero/loading-wide.webp") center/cover;
+}
+.ready-content {
+  width: min(100%, 33rem);
+  display: grid;
+  justify-items: center;
+}
+.ready-content .ready-mark {
+  width: 3.3rem;
+}
+.ready-content h1 {
+  font-size: clamp(2rem, 3.6vw, 3.3rem);
+  letter-spacing: -0.05em;
+  line-height: 1.12;
+  margin: 1.3rem 0 0.7rem;
+}
+.ready-content > p {
+  font-size: 1.25rem;
+}
+.ready-view,
+.ready-manage {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 0.65rem 1.7rem;
+  border-radius: 2rem;
+  min-width: 12rem;
+  min-height: 44px;
+  border: 1px solid #d6c6a7;
+}
+.ready-view {
+  background: #fff0d9;
+  color: #19271b;
+  margin: 1.5rem 0 0.5rem;
+}
+.ready-share {
+  width: 100%;
+  margin-top: 2rem;
+  border-top: 1px solid #aa9e7c80;
+  padding-top: 1.3rem;
+  display: grid;
+  gap: 0.65rem;
+  justify-items: center;
+  font:
+    0.85rem/1.45 var(--font-inter),
+    Arial,
+    sans-serif;
+}
+.ready-share h2 {
+  font:
+    1.4rem var(--font-playfair),
+    Georgia,
+    serif;
+}
+.ready-share label {
+  width: 100%;
+  text-align: left;
+}
+.ready-share .studio-field input {
+  width: 100%;
+  color: #25271e;
+  background: #fff6e9;
+}
+.ready-share .flex {
+  justify-content: center;
+}
+.ready-share button,
+.ready-share .studio-link {
+  color: inherit;
+  border: 1px solid #ccbb99;
+  background: transparent;
+  min-height: 44px;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  text-decoration: none;
+}
+.ready-page :focus-visible {
+  outline: 2px solid #ffdc93;
+  outline-offset: 3px;
+}
+.ready-share [role="status"] {
+  min-height: 1.3em;
+}
+@media (max-width: 680px) {
+  .ready-page[data-art="review"] {
+    background-image: url("/dev/home-hero/loading-portrait.webp");
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ready-content {
+    animation: ready-enter 0.45s ease-out;
+  }
+  @keyframes ready-enter {
+    from {
+      opacity: 0.6;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}

@@ -174,3 +174,146 @@
 .studio-primary-link:hover {
   background: #465743;
 }
+
+.studio-shell {
+  background: #f6ecdf;
+  color: #29291f;
+}
+.studio-heading {
+  letter-spacing: -0.045em;
+  font-weight: 400;
+}
+.studio-shell:has(.studio-workspace) .studio-container {
+  max-width: 76rem;
+}
+.studio-shell:has(.studio-workspace) .studio-header {
+  border: 0;
+}
+.studio-workspace {
+  display: grid;
+  gap: clamp(1.5rem, 4vw, 4.5rem);
+  align-items: start;
+}
+.studio-sections {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding-bottom: 1rem;
+}
+.studio-sections :is(a, button) {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.3em;
+}
+.studio-form fieldset,
+.studio-form .studio-panel {
+  background: transparent;
+  border: 0;
+  border-top: 1px solid #c6b89d;
+  border-radius: 0;
+  padding-inline: 0;
+}
+.studio-field :is(input, textarea) {
+  background: #fff9ef;
+  border-color: #ab9d84;
+}
+.studio-form legend {
+  font:
+    1.35rem var(--font-playfair),
+    Georgia,
+    serif;
+  padding-right: 0.7rem;
+}
+.studio-form .studio-actions {
+  border-block: 1px solid #c6b89d;
+  padding-block: 0.7rem;
+}
+.studio-live {
+  min-width: 0;
+}
+.studio-live > h2 {
+  font-size: 0.68rem;
+  letter-spacing: 0.19em;
+  text-transform: uppercase;
+  margin-bottom: 0.7rem;
+}
+.studio-live .studio-live-cover {
+  min-height: 0;
+  padding: 0;
+}
+.studio-live .studio-live-cover,
+.studio-empty-cover {
+  border: 1px solid #b6a587;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.studio-live .heirloom-cover,
+.studio-empty-cover {
+  min-height: 0;
+  aspect-ratio: 3/4;
+  width: 100%;
+}
+.studio-live .heirloom-cover {
+  padding: 1rem;
+}
+.studio-live .heirloom-cover__names {
+  font-size: clamp(1.9rem, 3.8vw, 3.6rem);
+}
+.studio-live .heirloom-cover__date {
+  font-size: 1rem;
+}
+.studio-empty-cover {
+  display: grid;
+  align-content: center;
+  text-align: center;
+  gap: 1.2rem;
+  background: #eee0cc;
+  padding: 1.5rem;
+}
+.studio-empty-cover em {
+  font:
+    italic 2.4rem var(--font-playfair),
+    Georgia,
+    serif;
+}
+.studio-empty-cover p {
+  font-size: 0.85rem;
+}
+.studio-live-cover,
+.studio-empty-cover {
+  max-width: 29rem;
+  margin-inline: auto;
+}
+@media (min-width: 780px) {
+  .studio-workspace {
+    grid-template-columns: minmax(0, 1.3fr) minmax(16rem, 0.78fr);
+  }
+  .studio-live {
+    position: sticky;
+    top: 1.6rem;
+  }
+}
+@media (max-width: 779px) {
+  .studio-live {
+    grid-row: 1;
+  }
+  .studio-live .studio-live-cover,
+  .studio-empty-cover {
+    max-width: 13rem;
+  }
+  .studio-live .heirloom-cover__eyebrow {
+    font-size: 0.55rem;
+  }
+  .studio-live .heirloom-cover__date {
+    font-size: 0.75rem;
+  }
+  .studio-live .heirloom-cover__names {
+    font-size: 1.55rem;
+  }
+  .studio-live > h2 {
+    text-align: center;
+  }
+}

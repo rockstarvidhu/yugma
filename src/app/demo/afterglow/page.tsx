@@ -15,6 +15,7 @@ export default async function AfterglowDemo({
   const { personalize } = await searchParams;
   return (
     <DemoPreview
+      liveEditing
       initiallyEditing={personalize === "1"}
       studioAvailable={canCreatePrivateDraft()}
     />

@@ -8,6 +8,7 @@ const inter = Inter({
   display: "swap",
 });
 const playfair = Playfair_Display({
+  style: ["normal", "italic"],
   variable: "--font-playfair",
   subsets: ["latin"],
   display: "swap",

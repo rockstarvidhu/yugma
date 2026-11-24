@@ -1,74 +1,54 @@
 "use client";
-
 import { BrandLogo } from "@/components/brand/BrandLogo";
-import { storefrontRoutes } from "@/lib/storefront-routes";
-
-export function StorefrontHeader({
-  studioAvailable,
-}: {
-  studioAvailable: boolean;
-}) {
+export function StorefrontHeader({ startUrl }: { startUrl: string }) {
   const links = [
-    { label: "Invitations", href: storefrontRoutes.collection },
-    { label: "How it works", href: storefrontRoutes.howItWorks },
-    ...(studioAvailable ? [{ label: "Studio", href: "/studio" }] : []),
+    ["Templates", "/#templates"],
+    ["Studio", "/studio"],
+    ["Sign in", "/sign-in"],
+    ["Get started", startUrl],
   ];
-
+  const nav = links.map(([name, url]) => (
+    <a
+      key={name}
+      href={url}
+      className={name === "Get started" ? "home-start" : undefined}
+    >
+      {name}
+    </a>
+  ));
   return (
     <header className="home-header">
-      <div className="home-shell home-header-row">
-        <a
-          href={storefrontRoutes.home}
-          className="home-header-logo"
-          aria-label="YUGMA home"
-        >
-          <BrandLogo
-            decorative
-            variant="emblem"
-            tone="white"
-            className="home-mark-light"
-          />
-          <BrandLogo
-            decorative
-            variant="emblem"
-            tone="forest"
-            className="home-mark-dark"
-          />
-        </a>
-        <nav className="home-desktop-nav" aria-label="Main navigation">
-          {links.map(({ label, href }) => (
-            <a href={href} key={href}>
-              {label}
-            </a>
-          ))}
-        </nav>
-        <details
-          className="home-menu"
-          onKeyDown={(event) => {
-            if (event.key !== "Escape" || !event.currentTarget.open) return;
-            event.currentTarget.open = false;
-            event.currentTarget.querySelector("summary")?.focus();
+      <BrandLogo
+        href="/"
+        label="YUGMA home"
+        tone="sand"
+        className="home-header-wordmark"
+      />
+      <nav className="home-desktop-nav" aria-label="Main navigation">
+        {nav}
+      </nav>
+      <details
+        className="home-menu"
+        onKeyDown={(e) => {
+          if (e.key === "Escape" && e.currentTarget.open) {
+            e.currentTarget.open = false;
+            e.currentTarget.querySelector("summary")?.focus();
+          }
+        }}
+      >
+        <summary>
+          Menu <span aria-hidden="true">☰</span>
+        </summary>
+        <nav
+          aria-label="Mobile navigation"
+          onClick={(e) => {
+            if ((e.target as Element).closest("a"))
+              e.currentTarget.closest("details")!.open = false;
           }}
         >
-          <summary>
-            Menu <span aria-hidden="true" className="home-menu-icon" />
-          </summary>
-          <nav aria-label="Mobile navigation">
-            {links.map(({ label, href }) => (
-              <a
-                href={href}
-                key={href}
-                onClick={(event) => {
-                  const menu = event.currentTarget.closest("details");
-                  if (menu) menu.open = false;
-                }}
-              >
-                {label}
-              </a>
-            ))}
-          </nav>
-        </details>
-      </div>
+          {nav}
+        </nav>
+      </details>
     </header>
   );
 }

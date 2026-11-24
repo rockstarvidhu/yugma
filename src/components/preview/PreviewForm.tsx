@@ -69,10 +69,12 @@ function Field({
 export function PreviewForm({
   sample,
   apply,
+  onValidEdit,
   reset,
 }: {
   sample: Invitation;
   apply: (invitation: Invitation) => void;
+  onValidEdit?: (invitation: Invitation) => void;
   reset: () => void;
 }) {
   const id = useId();
@@ -93,6 +95,10 @@ export function PreviewForm({
 
   function updateField(key: string, next: PreviewFields) {
     setFields(next);
+    if (onValidEdit) {
+      const updated = validatePreview(sample, next).invitation;
+      if (updated) onValidEdit(updated);
+    }
     if (!errors[key]) return;
 
     const message = validatePreview(sample, next).errors?.[key];

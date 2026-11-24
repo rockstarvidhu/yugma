@@ -8,3 +8,7 @@ next-env.d.ts
 
 # Preserve supplied production assets byte-for-byte.
 public/brand/
+
+# Local visual review inputs and browser evidence.
+assets/storefront-hero-review/
+artifacts/storefront-editorial/private/

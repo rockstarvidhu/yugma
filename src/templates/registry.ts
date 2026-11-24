@@ -1,3 +1,4 @@
+import { afterglowListing } from "./afterglow/listing";
 import { Afterglow } from "./afterglow/Afterglow";
 import type { TemplateDefinition } from "./types";
 
@@ -12,9 +13,12 @@ export function createTemplateRegistry(
       throw new Error(`Duplicate template ID: ${definition.id}`);
     templates.set(definition.id, Object.freeze({ ...definition }));
   }
-  return { get: (id: string) => templates.get(id) };
+  return {
+    list: () => Array.from(templates.values()),
+    get: (id: string) => templates.get(id),
+  };
 }
 
 export const templateRegistry = createTemplateRegistry([
-  { id: "afterglow", Component: Afterglow },
+  { id: "afterglow", Component: Afterglow, listing: afterglowListing },
 ]);

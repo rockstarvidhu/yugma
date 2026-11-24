@@ -164,6 +164,19 @@ const transport = createServer(async (req, res) => {
     }
     if (url.pathname === "/auth/v1/user")
       return user ? send(200, user) : send(401, {});
+    if (
+      url.pathname === "/rest/v1/templates" &&
+      req.headers.apikey === publishableKey &&
+      url.searchParams.get("select") === "registry_key,price_in_paise"
+    )
+      return send(
+        200,
+        (
+          await db.query(
+            "select registry_key,price_in_paise from public.templates where status='active' and draft_eligible and currency='INR' and price_in_paise>=100",
+          )
+        ).rows,
+      );
     if (url.pathname === "/rest/v1/templates" && user)
       return send(
         200,
@@ -266,11 +279,33 @@ function webhook(order, status, signatureValid = true) {
 const listen = (server) =>
   new Promise((done) => server.listen(0, "127.0.0.1", done));
 const close = (server) => new Promise((done) => server.close(done));
-const shot = (page, name) =>
-  page.screenshot({
+async function shot(page, name) {
+  const original = page.viewportSize();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.evaluate(() => document.fonts.ready);
+  await page
+    .locator(".heirloom-cover__image")
+    .first()
+    .evaluateAll(async (nodes) => {
+      await Promise.all(nodes.map((img) => img.decode().catch(() => {})));
+    });
+  await page.screenshot({
     path: resolve(evidence, name + ".png"),
     animations: "disabled",
   });
+  if (original) {
+    const alternate =
+      original.width === 390
+        ? { width: 1440, height: 900 }
+        : { width: 390, height: 844 };
+    await page.setViewportSize(alternate);
+    await page.screenshot({
+      path: resolve(evidence, name + "-" + alternate.width + ".png"),
+      animations: "disabled",
+    });
+    await page.setViewportSize(original);
+  }
+}
 const role = (page, name, text) =>
   page.getByRole(name, { name: text, exact: true });
 const post = (page, path, data) =>
@@ -391,6 +426,19 @@ try {
   page.on("pageerror", (error) =>
     console.error("Browser error", error.message),
   );
+  if (process.env.YUGMA_STOREFRONT_PHOTO_PREVIEW === "1") {
+    await db.query(
+      "update public.templates set price_in_paise=91700 where registry_key='afterglow'",
+    );
+    await page.goto(base);
+    await page.getByText("₹917", { exact: true }).waitFor();
+    await db.query(
+      "update public.templates set price_in_paise=89900 where registry_key='afterglow'",
+    );
+    pass(
+      "The gated product detail read the current active test price from PostgreSQL.",
+    );
+  }
   await page.goto(base + "/demo/afterglow");
   await page.getByRole("complementary", { name: "Demo preview" }).waitFor();
   await shot(page, "01-sample");
@@ -466,6 +514,8 @@ try {
     [id, order],
   );
   await page.goto(base + checkout);
+  await role(page, "button", "Open Razorpay Test Mode").waitFor();
+  await shot(page, "checkout");
   await role(page, "button", "Open Razorpay Test Mode").click();
   await page
     .getByText(
@@ -503,7 +553,7 @@ try {
   await page.getByRole("checkbox").check();
   await shot(page, "05-publish-review");
   await role(page, "button", "Publish invitation").click();
-  await role(page, "heading", "Invitation published").waitFor();
+  await role(page, "heading", "Your invitation is ready.").waitFor();
   await role(page, "button", "Copy link").click();
   await page.getByText("Link copied.").waitFor();
   assert.equal(
@@ -595,7 +645,7 @@ try {
 
   await page.goto(base + editor);
   await page.waitForURL(base + review);
-  await role(page, "heading", "Invitation published").waitFor();
+  await role(page, "heading", "Your invitation is ready.").waitFor();
   const retry = await post(page, endpoint, {
     ...body,
     slug: "different-link",

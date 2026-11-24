@@ -61,3 +61,52 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.studio-shell:has(.checkout-layout) .studio-container {
+  max-width: 42rem;
+}
+.checkout-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  background: #fbf4e9;
+  border-block: 1px solid #c8b99e;
+}
+.checkout-layout .studio-panel {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: clamp(1rem, 3vw, 1.75rem);
+}
+.checkout-summary {
+  grid-template-columns: 5rem minmax(0, 1fr);
+}
+.checkout-summary img {
+  border-radius: 2px;
+}
+.checkout-summary .checkout-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.checkout-summary h2 {
+  font-weight: 400;
+  font-style: italic;
+}
+.checkout-layout .checkout-payment {
+  border-top: 1px solid #d5c8b5;
+  gap: 0.7rem;
+}
+.checkout-price {
+  letter-spacing: -0.05em;
+}
+
+.studio-shell:has(.checkout-layout) .studio-heading {
+  font-size: clamp(2rem, 3.1vw, 2.85rem);
+}
+.studio-shell .studio-header > span {
+  width: 7rem;
+}
+.checkout-payment .checkout-price {
+  margin-top: 0.35rem;
+}

@@ -1,3 +1,4 @@
+import { readTestPrices } from "@/lib/checkout/catalogue";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -37,7 +38,11 @@ const priceFormat = new Intl.NumberFormat("en-IN", {
   minimumFractionDigits: 0,
 });
 
-export default function TemplatesPage() {
+export const dynamic = "force-dynamic";
+export default async function TemplatesPage() {
+  const prices: Record<string, number> = await readTestPrices().catch(
+    () => ({}),
+  );
   const collection = getStorefrontCatalogue();
 
   return (
@@ -86,11 +91,11 @@ export default function TemplatesPage() {
                       <p className="catalogue-description">
                         {template.description}
                       </p>
-                      {template.price.amountMinor !== null && (
+                      {Number.isSafeInteger(prices[template.templateId]) && (
                         <p className="catalogue-price">
                           <strong>
                             {priceFormat.format(
-                              template.price.amountMinor / 100,
+                              prices[template.templateId] / 100,
                             )}{" "}
                             one-time
                           </strong>{" "}

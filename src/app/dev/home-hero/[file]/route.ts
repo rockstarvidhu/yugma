@@ -1,31 +1,33 @@
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
-import {
-  desktopHeroSources,
-  mobileHeroSources,
-  storefrontPhotoReviewEnabled,
-} from "@/lib/home-hero-assets";
+import { basename, join } from "node:path";
+import manifest from "@/lib/storefront-art.json";
+import { storefrontPhotoReviewEnabled } from "@/lib/home-hero-assets";
 
-const privateHeaders = {
+const headers = {
   "Cache-Control": "private, no-store",
   "X-Robots-Tag": "noindex, noimageindex",
+  "X-Content-Type-Options": "nosniff",
 };
-
 export async function GET(
   _request: Request,
   { params }: RouteContext<"/dev/home-hero/[file]">,
 ) {
   const { file } = await params;
-  const allowed = [...desktopHeroSources, ...mobileHeroSources].some(
-    ([name]) => name === file,
-  );
-  if (storefrontPhotoReviewEnabled() && allowed) {
+  if (
+    storefrontPhotoReviewEnabled() &&
+    manifest.some((entry) => basename(entry.path) === file)
+  ) {
     try {
       const bytes = await readFile(
         join(process.cwd(), "assets", "storefront-hero-review", file),
       );
       return new Response(new Uint8Array(bytes), {
-        headers: { ...privateHeaders, "Content-Type": "image/webp" },
+        headers: {
+          ...headers,
+          "Content-Type": file.endsWith(".svg")
+            ? "image/svg+xml"
+            : "image/webp",
+        },
       });
     } catch (error) {
       if (!(
@@ -36,5 +38,5 @@ export async function GET(
         throw error;
     }
   }
-  return new Response(null, { status: 404, headers: privateHeaders });
+  return new Response(null, { status: 404, headers });
 }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
+import { Cover } from "@/components/invitation/Cover";
 import { DemoWatermark } from "@/components/preview/DemoWatermark";
 import { InvitationRenderer } from "@/invitations/renderer/InvitationRenderer";
 import {
@@ -377,9 +378,11 @@ export function StudioEditor({
       </>
     );
 
+  const current = readEditorSnapshot(draft, dates).snapshot;
+  const cover = current && prepareStudioPreview(current).invitation;
   return (
     <StudioShell
-      title={`Edit ${templateName}`}
+      title={`Personalize ${templateName}`}
       back={
         <Link
           href="/studio"
@@ -401,233 +404,275 @@ export function StudioEditor({
         Your draft is private. Save what you have, even when details are still
         missing.
       </p>
-      <form
-        ref={formRef}
-        aria-label="Invitation editor"
-        className="studio-form"
-        onSubmit={save}
-        noValidate
-      >
-        <div className="studio-actions">
-          <span role="status">
-            {busy === "save"
-              ? "Saving draft…"
-              : busy === "reload"
-                ? "Loading latest draft…"
-                : dirty
-                  ? "Unsaved changes"
-                  : problem
-                    ? "Draft needs attention"
-                    : notice || "All changes saved"}
-          </span>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              ref={previewButton}
-              variant="secondary"
+      <div className="studio-workspace">
+        <div>
+          <nav className="studio-sections" aria-label="Editor sections">
+            <a href="#studio-details">Details</a>
+            {mediaAvailable && <a href="#studio-photos">Photos</a>}
+            <button
+              type="button"
               disabled={Boolean(busy) || photoBusy}
               onClick={showPreview}
             >
-              Preview invitation
-            </Button>
-            <Button
-              type="submit"
-              disabled={
-                Boolean(busy) ||
-                photoBusy ||
-                confirmReload ||
-                problem?.status === 409 ||
-                problem?.status === 404
-              }
-            >
-              Save draft
-            </Button>
-          </div>
-        </div>
-        {dirty && notice && <p role="status">{notice}</p>}
-        {problem && (
-          <div
-            className="studio-panel studio-error"
-            ref={errorRef}
-            role="alert"
-            tabIndex={-1}
+              Preview
+            </button>
+          </nav>
+          <form
+            ref={formRef}
+            aria-label="Invitation editor"
+            className="studio-form"
+            onSubmit={save}
+            noValidate
           >
-            <p>{problem.message}</p>
-            {problem.issues?.length ? (
-              <ul className="list-disc pl-5">
-                {problem.issues.map(({ path, message }, index) => (
-                  <li key={`${path}-${index}`}>{message}</li>
-                ))}
-              </ul>
-            ) : null}
-            {(problem.status === 401 || problem.signIn) && (
-              <a
-                href={signIn}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="studio-link"
+            <div className="studio-actions">
+              <span role="status">
+                {busy === "save"
+                  ? "Saving draft…"
+                  : busy === "reload"
+                    ? "Loading latest draft…"
+                    : dirty
+                      ? "Unsaved changes"
+                      : problem
+                        ? "Draft needs attention"
+                        : notice || "All changes saved"}
+              </span>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  ref={previewButton}
+                  variant="secondary"
+                  disabled={Boolean(busy) || photoBusy}
+                  onClick={showPreview}
+                >
+                  Preview invitation
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={
+                    Boolean(busy) ||
+                    photoBusy ||
+                    confirmReload ||
+                    problem?.status === 409 ||
+                    problem?.status === 404
+                  }
+                >
+                  Save draft
+                </Button>
+              </div>
+            </div>
+            {dirty && notice && <p role="status">{notice}</p>}
+            {problem && (
+              <div
+                className="studio-panel studio-error"
+                ref={errorRef}
+                role="alert"
+                tabIndex={-1}
               >
-                Sign in again in a new tab
-              </a>
-            )}
-            {problem.status === 409 &&
-              (!confirmReload ? (
-                <div>
-                  <Button
-                    variant="secondary"
-                    onClick={() => setConfirmReload(true)}
+                <p>{problem.message}</p>
+                {problem.issues?.length ? (
+                  <ul className="list-disc pl-5">
+                    {problem.issues.map(({ path, message }, index) => (
+                      <li key={`${path}-${index}`}>{message}</li>
+                    ))}
+                  </ul>
+                ) : null}
+                {(problem.status === 401 || problem.signIn) && (
+                  <a
+                    href={signIn}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="studio-link"
                   >
-                    Load latest saved copy
-                  </Button>
-                </div>
-              ) : (
-                <div className="grid gap-2">
-                  <p>
-                    Loading the latest copy will discard these unsaved edits.
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant="secondary"
-                      disabled={Boolean(busy) || photoBusy}
-                      onClick={reload}
-                    >
-                      Discard edits and reload
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      disabled={Boolean(busy)}
-                      onClick={() => setConfirmReload(false)}
-                    >
-                      Keep editing
-                    </Button>
-                  </div>
-                </div>
-              ))}
-          </div>
-        )}
-        <fieldset disabled={Boolean(busy)} className="studio-events">
-          <legend>Invitation details</legend>
-          <div className="studio-grid">
-            <StudioField
-              path="couple.partnerOne"
-              label="Partner 1 name"
-              value={draft.couple?.partnerOne}
-              onChange={(partnerOne) =>
-                update({ couple: { ...draft.couple, partnerOne } })
-              }
-              issues={fieldErrors}
-            />
-            <StudioField
-              path="couple.partnerTwo"
-              label="Partner 2 name"
-              value={draft.couple?.partnerTwo}
-              onChange={(partnerTwo) =>
-                update({ couple: { ...draft.couple, partnerTwo } })
-              }
-              issues={fieldErrors}
-            />
-          </div>
-          <StudioField
-            path="timeZone"
-            label="Wedding timezone"
-            value={draft.timeZone}
-            onChange={(timeZone) => update({ timeZone })}
-            hint="Use a timezone such as Asia/Kolkata or Europe/London. Dates and times below use this timezone."
-            issues={fieldErrors}
-          />
-          <StudioField
-            path="welcomeNote"
-            label="Welcome message"
-            multiline
-            value={draft.welcomeNote}
-            onChange={(welcomeNote) => update({ welcomeNote })}
-            issues={fieldErrors}
-          />
-          <StudioField
-            path="closingNote"
-            label="Closing message"
-            multiline
-            value={draft.closingNote}
-            onChange={(closingNote) => update({ closingNote })}
-            issues={fieldErrors}
-          />
-          <StudioField
-            path="hosts"
-            label="Hosts"
-            multiline
-            value={hosts}
-            onChange={(value) => {
-              setHosts(value);
-              markEdited();
-            }}
-            hint="Enter one host name per line."
-            issues={{
-              ...fieldErrors,
-              hosts:
-                fieldErrors.hosts ??
-                Object.entries(fieldErrors).find(([key]) =>
-                  key.startsWith("hosts."),
-                )?.[1] ??
-                "",
-            }}
-          />
-        </fieldset>
-        <StudioPhoto
-          draftId={saved.id}
-          photo={draft.coverImage}
-          available={mediaAvailable}
-          disabled={Boolean(busy)}
-          issues={fieldErrors}
-          onChange={(coverImage) => update({ coverImage })}
-          onBusy={setPhotoBusy}
-        />
-        <section className="studio-events" aria-labelledby="studio-ceremonies">
-          <h2
-            id="studio-ceremonies"
-            className="font-editorial text-2xl"
-            ref={eventHeading}
-            tabIndex={-1}
-          >
-            Wedding ceremonies
-          </h2>
-          <p className="text-sm">
-            Set the wedding date and time on the main ceremony. A date and time
-            you enter is interpreted in the wedding timezone.
-          </p>
-          {draft.events?.map((event, index) => (
-            <StudioEventFields
-              key={event.id}
-              event={event}
-              index={index}
-              issues={fieldErrors}
+                    Sign in again in a new tab
+                  </a>
+                )}
+                {problem.status === 409 &&
+                  (!confirmReload ? (
+                    <div>
+                      <Button
+                        variant="secondary"
+                        onClick={() => setConfirmReload(true)}
+                      >
+                        Load latest saved copy
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="grid gap-2">
+                      <p>
+                        Loading the latest copy will discard these unsaved
+                        edits.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          variant="secondary"
+                          disabled={Boolean(busy) || photoBusy}
+                          onClick={reload}
+                        >
+                          Discard edits and reload
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          disabled={Boolean(busy)}
+                          onClick={() => setConfirmReload(false)}
+                        >
+                          Keep editing
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+            <fieldset
+              id="studio-details"
               disabled={Boolean(busy)}
-              localDate={
-                Object.hasOwn(dates, event.id)
-                  ? dates[event.id]
-                  : event.startsAt
-                    ? localEventTime(event.startsAt, displayZone)
-                    : ""
-              }
-              update={(patch) => updateEvent(event.id, patch)}
-              remove={() => removeEvent(event.id)}
-              updateDate={(value) => {
-                setDates((current) => ({ ...current, [event.id]: value }));
-                markEdited();
-              }}
-            />
-          ))}
-          <div>
-            <Button
-              variant="secondary"
-              disabled={
-                Boolean(busy) || (draft.events?.length ?? 0) >= MAX_EVENTS
-              }
-              onClick={addEvent}
+              className="studio-events"
             >
-              Add ceremony
-            </Button>
-          </div>
-        </section>
-      </form>
+              <legend>Invitation details</legend>
+              <div className="studio-grid">
+                <StudioField
+                  path="couple.partnerOne"
+                  label="Partner 1 name"
+                  value={draft.couple?.partnerOne}
+                  onChange={(partnerOne) =>
+                    update({ couple: { ...draft.couple, partnerOne } })
+                  }
+                  issues={fieldErrors}
+                />
+                <StudioField
+                  path="couple.partnerTwo"
+                  label="Partner 2 name"
+                  value={draft.couple?.partnerTwo}
+                  onChange={(partnerTwo) =>
+                    update({ couple: { ...draft.couple, partnerTwo } })
+                  }
+                  issues={fieldErrors}
+                />
+              </div>
+              <StudioField
+                path="timeZone"
+                label="Wedding timezone"
+                value={draft.timeZone}
+                onChange={(timeZone) => update({ timeZone })}
+                hint="Use a timezone such as Asia/Kolkata or Europe/London. Dates and times below use this timezone."
+                issues={fieldErrors}
+              />
+              <StudioField
+                path="welcomeNote"
+                label="Welcome message"
+                multiline
+                value={draft.welcomeNote}
+                onChange={(welcomeNote) => update({ welcomeNote })}
+                issues={fieldErrors}
+              />
+              <StudioField
+                path="closingNote"
+                label="Closing message"
+                multiline
+                value={draft.closingNote}
+                onChange={(closingNote) => update({ closingNote })}
+                issues={fieldErrors}
+              />
+              <StudioField
+                path="hosts"
+                label="Hosts"
+                multiline
+                value={hosts}
+                onChange={(value) => {
+                  setHosts(value);
+                  markEdited();
+                }}
+                hint="Enter one host name per line."
+                issues={{
+                  ...fieldErrors,
+                  hosts:
+                    fieldErrors.hosts ??
+                    Object.entries(fieldErrors).find(([key]) =>
+                      key.startsWith("hosts."),
+                    )?.[1] ??
+                    "",
+                }}
+              />
+            </fieldset>
+            <div id="studio-photos">
+              <StudioPhoto
+                draftId={saved.id}
+                photo={draft.coverImage}
+                available={mediaAvailable}
+                disabled={Boolean(busy)}
+                issues={fieldErrors}
+                onChange={(coverImage) => update({ coverImage })}
+                onBusy={setPhotoBusy}
+              />
+            </div>
+            <section
+              className="studio-events"
+              aria-labelledby="studio-ceremonies"
+            >
+              <h2
+                id="studio-ceremonies"
+                className="font-editorial text-2xl"
+                ref={eventHeading}
+                tabIndex={-1}
+              >
+                Wedding ceremonies
+              </h2>
+              <p className="text-sm">
+                Set the wedding date and time on the main ceremony. A date and
+                time you enter is interpreted in the wedding timezone.
+              </p>
+              {draft.events?.map((event, index) => (
+                <StudioEventFields
+                  key={event.id}
+                  event={event}
+                  index={index}
+                  issues={fieldErrors}
+                  disabled={Boolean(busy)}
+                  localDate={
+                    Object.hasOwn(dates, event.id)
+                      ? dates[event.id]
+                      : event.startsAt
+                        ? localEventTime(event.startsAt, displayZone)
+                        : ""
+                  }
+                  update={(patch) => updateEvent(event.id, patch)}
+                  remove={() => removeEvent(event.id)}
+                  updateDate={(value) => {
+                    setDates((current) => ({ ...current, [event.id]: value }));
+                    markEdited();
+                  }}
+                />
+              ))}
+              <div>
+                <Button
+                  variant="secondary"
+                  disabled={
+                    Boolean(busy) || (draft.events?.length ?? 0) >= MAX_EVENTS
+                  }
+                  onClick={addEvent}
+                >
+                  Add ceremony
+                </Button>
+              </div>
+            </section>
+          </form>
+        </div>
+        <aside className="studio-live" aria-label="Live cover preview">
+          <h2>Cover preview</h2>
+          {cover ? (
+            <div className="afterglow-invitation studio-live-cover">
+              <Cover invitation={cover} privateDraftId={saved.id} />
+            </div>
+          ) : (
+            <div className="studio-empty-cover">
+              <em>
+                {[draft.couple?.partnerOne, draft.couple?.partnerTwo]
+                  .filter(Boolean)
+                  .join(" & ") || templateName}
+              </em>
+              <p>Add both names and a complete ceremony to see your cover.</p>
+            </div>
+          )}
+        </aside>
+      </div>
       {checkoutUrl && (
         <section
           className="studio-panel"

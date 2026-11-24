@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { BrandLogo } from "@/components/brand/BrandLogo";
+import { storefrontPhotoReviewEnabled } from "@/lib/home-hero-assets";
+import { invitationPath } from "@/lib/publish/contract";
+import "./ready.css";
 import { StudioShell } from "@/components/studio/StudioShell";
 import { InvitationRenderer } from "@/invitations/renderer/InvitationRenderer";
 import { getServerAuth, requireStudioUser } from "@/lib/auth/server";
@@ -49,19 +53,34 @@ export default async function PublishPage({
   const [publication, draft] = loaded;
   if (publication)
     return (
-      <StudioShell
-        title="Invitation published"
-        back={
-          <Link className="studio-link" href="/studio">
-            Back to Studio
-          </Link>
-        }
+      <main
+        className="ready-page"
+        data-art={storefrontPhotoReviewEnabled() ? "review" : "brand"}
       >
-        <ShareInvitation
-          slug={publication.share_slug}
-          title={publication.test_publication_title}
-        />
-      </StudioShell>
+        <div className="ready-content">
+          <BrandLogo
+            variant="emblem"
+            tone="sand"
+            decorative
+            className="ready-mark"
+          />
+          <h1>Your invitation is ready.</h1>
+          <p>{publication.test_publication_title}</p>
+          <a
+            className="ready-view"
+            href={invitationPath(publication.share_slug)}
+          >
+            View My Invitation <span aria-hidden="true">→</span>
+          </a>
+          <Link className="ready-manage" href="/studio">
+            Manage Invitation
+          </Link>
+          <ShareInvitation
+            slug={publication.share_slug}
+            title={publication.test_publication_title}
+          />
+        </div>
+      </main>
     );
   if (!draft || draft.templateKey !== "afterglow") notFound();
 

@@ -1,14 +1,10 @@
+import { readTestPrices } from "@/lib/checkout/catalogue";
+import { storefrontPhotoReviewEnabled } from "@/lib/home-hero-assets";
 import type { Metadata } from "next";
-import { Inter_Tight } from "next/font/google";
 import { Storefront } from "@/components/storefront/Storefront";
 import { canCreatePrivateDraft } from "@/lib/auth/service";
 
-const interTight = Inter_Tight({
-  subsets: ["latin"],
-  weight: ["500", "600"],
-  display: "swap",
-  variable: "--font-home-inter-tight",
-});
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: { absolute: "YUGMA — Digital wedding invitations" },
@@ -33,11 +29,15 @@ export const metadata: Metadata = {
   },
 };
 
-export default function Home() {
+export default async function Home() {
   const studioAvailable = canCreatePrivateDraft();
+  const reviewPrices = storefrontPhotoReviewEnabled()
+    ? await readTestPrices().catch(() => ({}))
+    : {};
   return (
     <Storefront
-      fontClass={interTight.variable}
+      reviewPrices={reviewPrices}
+      supportEmail={process.env.STOREFRONT_SUPPORT_EMAIL}
       studioAvailable={studioAvailable}
     />
   );

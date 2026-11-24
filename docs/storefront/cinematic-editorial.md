@@ -1,5 +1,7 @@
 # Cinematic editorial storefront
 
+This document records PR #23. For the current review build, asset setup and browser checks, see [Reference-led storefront review](reference-led-review.md).
+
 The storefront starts from `ca99092eaefc547df6aba6ef726c0fbf038512b0`, which includes the historical homepage PR #13, Studio PR #18, media PR #19 and the Day 5 checkout work. `feat/storefront-cinematic-editorial` is isolated from the previous homepage, Studio, media and cinematic prototype worktrees.
 
 ## Visual review

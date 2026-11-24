@@ -1,5 +1,6 @@
 "use client";
 
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { InvitationRenderer } from "@/invitations/renderer/InvitationRenderer";
@@ -12,12 +13,14 @@ export function PreviewShell({
   sample,
   templateId,
   trustedImageOrigin,
+  liveEditing = false,
   initiallyEditing = false,
   studioAvailable = false,
 }: {
   sample: Invitation;
   templateId: string;
   trustedImageOrigin?: string;
+  liveEditing?: boolean;
   initiallyEditing?: boolean;
   studioAvailable?: boolean;
 }) {
@@ -32,8 +35,22 @@ export function PreviewShell({
   }
 
   return (
-    <>
+    <div className={"demo-shell" + (editing ? " editing" : "")}>
       <DemoWatermark mode={personalized ? "personalized" : "sample"} />
+      <header className="demo-mast">
+        <BrandLogo
+          href="/"
+          label="YUGMA home"
+          tone="sand"
+          className="demo-logo"
+        />
+        <Link
+          href="/#templates"
+          aria-label="Close demo and return to invitations"
+        >
+          Close demo ×
+        </Link>
+      </header>
       <section
         className="preview-panel"
         aria-labelledby="preview-controls-heading"
@@ -63,15 +80,18 @@ export function PreviewShell({
             <PreviewForm
               sample={sample}
               apply={setPersonalized}
+              onValidEdit={liveEditing ? setPersonalized : undefined}
               reset={reset}
             />
           )}
           <p role="status" className="preview-status">
-            {personalized
-              ? "Personalized invitation shown below."
-              : editing
-                ? "The sample stays visible until you apply your details."
-                : ""}
+            {liveEditing && editing
+              ? "Complete, valid edits appear in the invitation preview."
+              : personalized
+                ? "Personalized invitation shown below."
+                : editing
+                  ? "The sample stays visible until you apply your details."
+                  : ""}
           </p>
           {studioAvailable && (
             <p className="preview-studio">
@@ -88,6 +108,6 @@ export function PreviewShell({
           trustedImageOrigin={trustedImageOrigin}
         />
       </div>
-    </>
+    </div>
   );
 }

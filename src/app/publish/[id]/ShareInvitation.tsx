@@ -46,12 +46,9 @@ export function ShareInvitation({
   }
 
   return (
-    <section
-      className="studio-panel grid gap-4"
-      aria-labelledby="share-heading"
-    >
+    <section className="ready-share" aria-labelledby="share-heading">
       <h2 id="share-heading" className="font-editorial text-2xl">
-        {title}
+        Share your invitation
       </h2>
       <p>Anyone with this link can view the invitation.</p>
       <label className="studio-field">
@@ -77,14 +74,6 @@ export function ShareInvitation({
             Open WhatsApp
           </a>
         )}
-        <a
-          className="studio-link"
-          href={path}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Open public invitation
-        </a>
       </div>
       <p role="status">{status}</p>
     </section>

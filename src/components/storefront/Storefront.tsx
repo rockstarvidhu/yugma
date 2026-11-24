@@ -1,167 +1,252 @@
+import Link from "next/link";
+import Image from "next/image";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { getStorefrontCatalogue } from "@/lib/storefront-catalogue";
-import { storefrontRoutes } from "@/lib/storefront-routes";
-import { storefrontPhotoReviewEnabled } from "@/lib/home-hero-assets";
+import {
+  reviewArtBase,
+  storefrontPhotoReviewEnabled,
+} from "@/lib/home-hero-assets";
 import { HomepageHeroSequence } from "./HomepageHeroSequence";
-import { StorefrontExperience } from "./StorefrontExperience";
+import { SignatureMarquee, StorefrontExperience } from "./StorefrontExperience";
+import {
+  InvitationCollection,
+  type CollectionEntry,
+} from "./InvitationCollection";
+import { StorefrontHeader } from "./StorefrontHeader";
 import "./storefront.css";
 
-const steps = [
-  {
-    title: "Choose an invitation",
-    text: "Open Afterglow to explore the cover, ceremony schedule and venue details as a guest would.",
+const concepts = ["Heritage", "Serenity"].map((name) => ({
+  id: name.toLowerCase(),
+  name,
+  preview: {
+    src: reviewArtBase + "/" + name.toLowerCase() + "-art.svg",
+    alt: "",
+    width: 360,
+    height: 510,
   },
-  {
-    title: "Make it yours",
-    text: "Try your names, dates and venues in the browser. Your demo edits stay on that page.",
-  },
-  {
-    title: "Preview your invitation",
-    text: "Review the watermarked invitation with your details. Open Private Studio separately to save a draft when it’s available.",
-  },
-] as const;
-
+}));
 export function Storefront({
   photographic = storefrontPhotoReviewEnabled(),
-  fontClass = "",
   studioAvailable = false,
+  reviewPrices = {},
+  supportEmail,
 }: {
   photographic?: boolean;
-  fontClass?: string;
   studioAvailable?: boolean;
+  reviewPrices?: Record<string, number>;
+  supportEmail?: string;
 } = {}) {
-  const afterglow = getStorefrontCatalogue().find(
-    ({ templateId }) => templateId === "afterglow",
-  );
-
+  const designs = getStorefrontCatalogue();
+  const entries: CollectionEntry[] = designs.map((item) => ({
+    id: item.templateId,
+    name: item.name,
+    preview: item.preview,
+    detail: "#design-" + item.templateId,
+  }));
+  if (photographic && entries.length)
+    entries.push(
+      ...concepts.filter(
+        (concept) => !entries.some((entry) => entry.id === concept.id),
+      ),
+    );
+  const first = designs[0];
+  const start =
+    studioAvailable && first
+      ? "/create/" + first.templateId
+      : (first?.personalizeUrl ?? "/templates");
   return (
-    <StorefrontExperience
-      fontClass={fontClass}
-      studioAvailable={studioAvailable}
-    >
+    <StorefrontExperience review={photographic}>
+      <StorefrontHeader startUrl={start} />
       <main>
         <HomepageHeroSequence
           photographic={photographic}
-          demoUrl={afterglow?.demoUrl}
+          demoUrl={first?.demoUrl}
         />
         <section
-          className="home-statement"
+          className="home-purpose"
           id="statement"
-          aria-labelledby="statement-heading"
+          aria-labelledby="purpose-heading"
           tabIndex={-1}
         >
-          <div className="home-statement-stage home-shell">
-            <h2 id="statement-heading" aria-label="More than where and when.">
-              <span aria-hidden="true" className="home-word-group">
-                <span data-home-word>More</span>{" "}
-                <span data-home-word>than</span>
-              </span>{" "}
-              <span aria-hidden="true" className="home-word-group">
-                <span data-home-word>where</span>{" "}
-                <span data-home-word>and</span>{" "}
-                <span data-home-word>when.</span>
-              </span>
+          {photographic && (
+            <picture className="purpose-art">
+              <source
+                media="(max-width: 680px)"
+                srcSet={reviewArtBase + "/arch-portrait.webp"}
+              />
+              <img
+                alt=""
+                src={reviewArtBase + "/story-right.webp"}
+                width={1448}
+                height={1086}
+                loading="lazy"
+              />
+            </picture>
+          )}
+          <div data-reveal>
+            <p className="eyebrow">Our purpose</p>
+            <h2 id="purpose-heading">
+              Wedding invitations that feel <em>personal,</em> cinematic and{" "}
+              <em>yours.</em>
             </h2>
+            <span className="editorial-rule" />
+            <p className="purpose-description">
+              Thoughtfully designed digital invitations for modern celebrations,
+              rooted in timeless emotion.
+            </p>
           </div>
         </section>
-        <section
-          className="home-collection"
-          id="templates"
-          aria-labelledby="collection-heading"
-          tabIndex={-1}
-        >
-          {afterglow ? (
-            <div className="home-shell home-feature">
-              <div className="home-feature-copy">
-                <p className="home-kicker">The YUGMA Collection</p>
-                <h2 id="collection-heading">{afterglow.name}</h2>
-                <p>{afterglow.description}</p>
-                <div className="home-actions">
-                  <a
-                    className="home-button home-button-forest"
-                    href={afterglow.demoUrl}
-                  >
-                    View Live Demo <span aria-hidden="true">↗</span>
-                  </a>
-                  <a
-                    className="home-button home-button-outline"
-                    href={afterglow.personalizeUrl}
-                  >
-                    Personalize
-                  </a>
-                </div>
-              </div>
-              <picture className="home-feature-art">
-                <source
-                  media="(min-width: 820px)"
-                  srcSet="/images/storefront/afterglow-editorial-wide.webp"
-                  width={768}
-                  height={768}
-                />
-                {/* The responsive stills are captures from the real watermarked Afterglow renderer. */}
-                <img
-                  src="/images/storefront/afterglow-editorial-portrait.webp"
-                  width={430}
-                  height={615}
-                  alt="Afterglow’s sample cover for Tara and Neel, with the YUGMA Demo watermark."
+        <InvitationCollection entries={entries} />
+        {designs.map((item, index) => (
+          <section
+            key={item.templateId}
+            className="home-product"
+            id={"design-" + item.templateId}
+            aria-labelledby={"heading-" + item.templateId}
+          >
+            <div className="product-art">
+              {photographic && (
+                <Image
+                  unoptimized
+                  className="product-scene"
+                  src={reviewArtBase + "/detail-left.webp"}
+                  alt=""
+                  width={1448}
+                  height={1086}
                   loading="lazy"
-                  decoding="async"
                 />
-              </picture>
+              )}
+              <Image
+                className="product-cover"
+                {...item.preview}
+                alt={item.preview.alt}
+                sizes="(max-width:680px) 29vw, 11vw"
+                unoptimized
+              />
             </div>
-          ) : (
-            <div className="home-shell">
-              <h2 id="collection-heading">The YUGMA Collection</h2>
-              <p>Invitation demos will be available soon.</p>
+            <div className="product-main" data-reveal>
+              <p className="eyebrow">
+                Signature invitation / {String(index + 1).padStart(3, "0")}
+              </p>
+              <h2 id={"heading-" + item.templateId}>{item.name}</h2>
+              <p>{item.description}</p>
+              <span className="editorial-rule" />
+              {photographic &&
+              studioAvailable &&
+              Number.isSafeInteger(reviewPrices[item.templateId]) ? (
+                <>
+                  <p className="product-availability">
+                    {new Intl.NumberFormat("en-IN", {
+                      style: "currency",
+                      currency: item.price.currency,
+                      maximumFractionDigits: 2,
+                      minimumFractionDigits: 0,
+                    }).format(reviewPrices[item.templateId] / 100)}
+                  </p>
+                  <small>One-time test payment. No money is charged.</small>
+                </>
+              ) : (
+                <>
+                  <p className="product-availability">Demo available</p>
+                  <small>Public purchases haven’t opened yet.</small>
+                </>
+              )}
             </div>
-          )}
-        </section>
-        <section
-          className="home-how"
-          id="how-it-works"
-          aria-labelledby="how-heading"
-          tabIndex={-1}
-        >
-          <div className="home-shell">
-            <h2 id="how-heading">How it works</h2>
-            <ol role="list">
-              {steps.map((step, i) => (
-                <li key={step.title}>
-                  <span className="home-step-number" aria-hidden="true">
-                    0{i + 1}
-                  </span>
-                  <h3>{step.title}</h3>
-                  <p>{step.text}</p>
+            <ul className="product-features">
+              {item.features.map(([name, text], i) => (
+                <li key={name}>
+                  <svg
+                    width="23"
+                    height="23"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.15"
+                    aria-hidden="true"
+                  >
+                    {i === 0 ? (
+                      <>
+                        <rect x="2.5" y="4" width="19" height="15" rx="1" />
+                        <path d="m3 17 6-6 4 3 3-3 5 5" />
+                        <circle cx="16" cy="8.5" r="1.3" />
+                      </>
+                    ) : i === 1 ? (
+                      <>
+                        <rect x="3" y="5" width="18" height="16" rx="1.5" />
+                        <path d="M7 2v6m10-6v6M3 10h18m-14 4h3m3 0h3" />
+                      </>
+                    ) : (
+                      <>
+                        <path d="M19.5 10c0 5-7.5 12-7.5 12S4.5 15 4.5 10a7.5 7.5 0 0 1 15 0Z" />
+                        <circle cx="12" cy="10" r="2.6" />
+                      </>
+                    )}
+                  </svg>
+                  <div>
+                    <strong>{name}</strong>
+                    <p>{text}</p>
+                  </div>
                 </li>
               ))}
-            </ol>
-          </div>
-        </section>
-        <section className="home-final" aria-labelledby="closing-heading">
-          <BrandLogo
-            decorative
-            tone="white"
-            variant="emblem"
-            className="home-closing-emblem"
-          />
-          <h2 id="closing-heading">Give your story a beginning.</h2>
-          <a
-            className="home-button home-button-light"
-            href={storefrontRoutes.catalogue}
-          >
-            Explore Invitations <span aria-hidden="true">↗</span>
-          </a>
-        </section>
+            </ul>
+            <div className="home-actions product-actions">
+              <a className="home-button forest" href={item.demoUrl}>
+                ▷　View Live Demo
+              </a>
+              <a
+                className="home-button outline"
+                href={
+                  studioAvailable
+                    ? "/create/" + item.templateId
+                    : item.personalizeUrl
+                }
+              >
+                Personalize <span aria-hidden="true">→</span>
+              </a>
+            </div>
+          </section>
+        ))}
       </main>
-      <footer className="home-footer" id="contact" tabIndex={-1}>
-        <div className="home-shell home-footer-row">
-          <p>© YUGMA</p>
+      <footer className="home-footer" id="contact">
+        <div className="footer-information">
+          <div>
+            <BrandLogo
+              tone="sand"
+              href="/"
+              label="YUGMA home"
+              className="footer-wordmark"
+            />
+            <p>Digital wedding invitations</p>
+          </div>
+          <div id="how-it-works">
+            <h2>How it works</h2>
+            <p>
+              Explore a sample, try your details, then preview your invitation.
+            </p>
+          </div>
           <nav aria-label="Footer navigation">
-            <a href={storefrontRoutes.catalogue}>Invitation catalogue</a>
-            <a href={storefrontRoutes.howItWorks}>How it works</a>
-            <a href={storefrontRoutes.publicSupport}>Contact YUGMA on GitHub</a>
+            <h2>Explore</h2>
+            <a href="/templates">Invitation catalogue</a>
+            <Link href="/studio" prefetch={false}>
+              Private Studio
+            </Link>
           </nav>
+          <div>
+            <h2>Invitation help</h2>
+            {supportEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supportEmail) ? (
+              <a href={"mailto:" + supportEmail}>{supportEmail}</a>
+            ) : (
+              <p>
+                For invitation changes, open your saved draft in{" "}
+                <Link href="/studio" prefetch={false}>
+                  Studio
+                </Link>
+                . Guests can contact their wedding hosts.
+              </p>
+            )}
+          </div>
         </div>
+        <SignatureMarquee />
       </footer>
     </StorefrontExperience>
   );

@@ -2,9 +2,11 @@ import { shellDemoInvitation } from "@/templates/internal/demo-invitation";
 import { PreviewShell } from "./PreviewShell";
 
 export function DemoPreview({
+  liveEditing = false,
   initiallyEditing = false,
   studioAvailable = false,
 }: {
+  liveEditing?: boolean;
   initiallyEditing?: boolean;
   studioAvailable?: boolean;
 }) {
@@ -22,6 +24,7 @@ export function DemoPreview({
       sample={shellDemoInvitation}
       templateId="afterglow"
       trustedImageOrigin={trustedImageOrigin}
+      liveEditing={liveEditing}
       initiallyEditing={initiallyEditing}
       studioAvailable={studioAvailable}
     />

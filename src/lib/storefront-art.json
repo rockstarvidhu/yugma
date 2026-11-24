@@ -1,0 +1,74 @@
+[
+  {
+    "path": "assets/backgrounds/loading-wide.webp",
+    "sha256": "3e2f37f94e5fe760bea5cf7efbb61424d9d1c82a341ed6a1a167acac04a85439",
+    "status": "generated visual candidate",
+    "source": "velvet_forest_botanical_glow.png"
+  },
+  {
+    "path": "assets/backgrounds/loading-portrait.webp",
+    "sha256": "d3bdf640d50c838bce44a71e912320ec737aab1e9598eccd16df7ae771063477",
+    "status": "generated visual candidate",
+    "source": "velvet_forest_botanical_glow.png"
+  },
+  {
+    "path": "assets/backgrounds/collection-wide.webp",
+    "sha256": "abaabb08d202e03739e821f9c36ee11a57d9f26d5df4f1cfed45196247a1c2b0",
+    "status": "generated visual candidate",
+    "source": "dreamy_forest_green_botanical_bokeh.png"
+  },
+  {
+    "path": "assets/backgrounds/collection-portrait.webp",
+    "sha256": "c785e3033ad0ba557d4fdd829b062fe7804fa3aaedf9779a0f2ef759e65ed04b",
+    "status": "generated visual candidate",
+    "source": "dreamy_forest_green_botanical_bokeh.png"
+  },
+  {
+    "path": "assets/hero/hero-wide.webp",
+    "sha256": "287b34cdbd7e5cfeaf194f441e53497ef1854c38bdfc2ae11f848ff9d994da7d",
+    "status": "generated visual candidate",
+    "source": "embroidered_hands_in_golden_ceremony_light.png"
+  },
+  {
+    "path": "assets/hero/hero-portrait.webp",
+    "sha256": "5ba518616697f480d6331cf0edc61bd1a223f512baeb2709279e3a2890f4593a",
+    "status": "generated visual candidate",
+    "source": "intertwined_hands_in_golden_wedding_light.png"
+  },
+  {
+    "path": "assets/architecture/detail-left.webp",
+    "sha256": "6f3ccc967763e64d17c41865fb31c3746c5febd6df06c178f457b55783463c2f",
+    "status": "generated visual candidate",
+    "source": "sunlit_bougainvillea_colonnade.png"
+  },
+  {
+    "path": "assets/architecture/story-right.webp",
+    "sha256": "72f668cd8974f5f5eae633e5fa50c5d982a4efc70c5b198851bc1019a9279130",
+    "status": "generated visual candidate",
+    "source": "sunlit_bougainvillea_colonnade.png"
+  },
+  {
+    "path": "assets/architecture/arch-portrait.webp",
+    "sha256": "745b4be76f34dc9905afd4eb0f86f193727050f1667698dfebf22a06b5700c90",
+    "status": "generated visual candidate",
+    "source": "sunlit_bougainvillea_colonnade.png"
+  },
+  {
+    "path": "assets/teasers/heritage-art.svg",
+    "sha256": "6566347c218fff98e90bb764de807d9809f221cbf15e633be9d467f1c558ca6e",
+    "status": "editable decorative teaser",
+    "source": "YUGMA_Batch_02/assets/heritage_coming_soon.svg"
+  },
+  {
+    "path": "assets/teasers/serenity-art.svg",
+    "sha256": "094c86a3788035c9616003926eb06d1fef0a9d7d4ca3f727d55a48be46cc0612",
+    "status": "editable decorative teaser",
+    "source": "YUGMA_Batch_02/assets/serenity_coming_soon.svg"
+  },
+  {
+    "path": "assets/effects/floral-edge.webp",
+    "sha256": "75eb0a432ec3e9c112c020ce5bc7bb32eb96605a0f16868ccc1707a2fa55bdff",
+    "status": "derived alpha edge layer",
+    "source": "dreamy_forest_green_botanical_bokeh.png"
+  }
+]

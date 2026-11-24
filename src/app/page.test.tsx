@@ -6,12 +6,12 @@ import TemplatesPage, { metadata as catalogueMetadata } from "./templates/page";
 import { BrandLogo } from "@/components/brand/BrandLogo";
 import { Button } from "@/components/ui/Button";
 import { canCreatePrivateDraft } from "@/lib/auth/service";
+import { readTestPrices } from "@/lib/checkout/catalogue";
 import { getRazorpayTestConfig } from "@/lib/checkout/gateway";
 
-vi.mock("next/font/google", () => ({
-  Inter_Tight: () => ({ variable: "mock-inter-tight" }),
+vi.mock("@/lib/checkout/catalogue", () => ({
+  readTestPrices: vi.fn(async () => ({})),
 }));
-
 vi.mock("@/lib/auth/service", () => ({
   canCreatePrivateDraft: vi.fn(() => false),
 }));
@@ -35,8 +35,8 @@ afterEach(() => {
 });
 
 describe("YUGMA brand foundations", () => {
-  it("identifies the homepage with the official wordmark and description", () => {
-    render(<Home />);
+  it("identifies the homepage with the official wordmark and description", async () => {
+    render(await Home());
     expect(
       screen.getByRole("heading", {
         level: 1,
@@ -46,12 +46,11 @@ describe("YUGMA brand foundations", () => {
     const header = screen.getByRole("banner");
     const mark = within(header).getByRole("link", { name: "YUGMA home" });
     expect(
-      mark.querySelector('img[src="/brand/yugma-emblem-white.svg"]'),
+      mark.querySelector('img[src="/brand/yugma-wordmark-sand.svg"]'),
     ).toBeInTheDocument();
-    expect(mark.querySelector('img[src*="wordmark"]')).toBeNull();
     expect(
       document.querySelector(
-        '.home-hero img[src="/brand/yugma-wordmark-white.svg"]',
+        '.home-hero img[src="/brand/yugma-wordmark-sand.svg"]',
       ),
     ).toBeInTheDocument();
     expect(
@@ -74,14 +73,14 @@ describe("YUGMA brand foundations", () => {
       "/brand/yugma-emblem-sand.svg",
     );
   });
-  it("keeps the homepage price-free with Studio and Razorpay Test Mode configured", () => {
+  it("keeps the homepage price-free with Studio and Razorpay Test Mode configured", async () => {
     vi.mocked(canCreatePrivateDraft).mockReturnValue(true);
     vi.mocked(getRazorpayTestConfig).mockReturnValue({
       keyId: "rzp_test_Fixture",
       keySecret: "fixture-test-signing-secret",
     });
 
-    render(<Home />);
+    render(await Home());
     const navigation = screen.getByRole("navigation", {
       name: "Main navigation",
     });
@@ -92,8 +91,9 @@ describe("YUGMA brand foundations", () => {
       screen.queryByText(/₹|one-time in Test Mode/i),
     ).not.toBeInTheDocument();
   });
-  it("lists the registered design with separate sample and personalization links", () => {
-    render(<TemplatesPage />);
+  it("lists the registered design with separate sample and personalization links", async () => {
+    vi.mocked(readTestPrices).mockResolvedValue({ afterglow: 91200 });
+    render(await TemplatesPage());
     expect(
       screen.getByRole("heading", {
         level: 1,
@@ -105,7 +105,7 @@ describe("YUGMA brand foundations", () => {
     expect(
       within(cards[0]).getByRole("link", { name: "Heirloom sample" }),
     ).toHaveAttribute("href", "/demo/heirloom");
-    expect(screen.getByText("₹899 one-time")).toBeVisible();
+    expect(screen.getByText("₹912 one-time")).toBeVisible();
     expect(screen.getByText("in Test Mode")).toBeVisible();
     expect(screen.getByRole("link", { name: "Try Demo" })).toHaveAttribute(
       "href",
