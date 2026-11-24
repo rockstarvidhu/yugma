@@ -8,7 +8,7 @@ The existing staging project already has the early auth, draft and checkout sche
 
 | Route            | Verification                                                                                                                                                                                                           |
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/checkout/[id]` | The owner sees verification and the publish link after the draft-scoped status API reports a verified receipt. Polling and manual verification recover delayed capture.                                                |
+| `/checkout/[id]` | The owner sees verification and the publish link after the draft-scoped status API reports a verified receipt. Owner-scoped status polling and manual verification recover delayed capture.                            |
 | `/publish/[id]`  | The owner reviews the current saved invitation, chooses a title and slug, and confirms that the link and cover become public. The server checks the owner, verified order, and version in the publication transaction. |
 | `/i/[slug]`      | Anonymous guests see the published invitation and metadata. Cover photos go through a slug-scoped route that checks publication on each request.                                                                       |
 | `/studio`        | Published invitations have a share link. Reopening the old editor or checkout URL returns the owner to sharing.                                                                                                        |
@@ -26,6 +26,6 @@ Test receipts stay in the Razorpay Test Mode order lifecycle. Staging publicatio
 
 ## Playwright evidence
 
-Build with `npm run build` and run `node scripts/verify-publish-flow.mjs` with Playwright, Chromium and PGlite installed. When packages are installed outside the repo, set `PLAYWRIGHT_MODULE` and `PGLITE_MODULE` to their package directories. The runner starts and stops a loopback production server and writes screenshots plus `playwright-results.json` to `artifacts/day-06/`. The test uses a disposable database with the repository migrations, fixture Auth and object storage, and signed webhook fixtures.
+Build with `npm run build` and run `node scripts/verify-publish-flow.mjs` with Playwright, Chromium and PGlite installed. When packages are installed outside the repo, set `PLAYWRIGHT_MODULE` and `PGLITE_MODULE` to their package directories. The runner starts and stops a loopback production server and writes screenshots plus `playwright-results.json` to `artifacts/day-06/`. The test uses a disposable database with the repository migrations, fixture Auth and object storage, and signed webhook plus authoritative provider HTTP fixtures.
 
 The hosted release check uses the exact same four routes with separate browser contexts for the owner and guest. Complete a Razorpay Test Mode payment, publish, copy the link on desktop and mobile, and open it in a fresh browser context. Use a fictional invitation and cover.

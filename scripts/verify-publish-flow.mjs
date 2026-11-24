@@ -34,6 +34,10 @@ const publishableKey = "sb_publishable_local-publish-check";
 const webhookSecret = randomUUID();
 const users = new Map();
 const objects = new Map();
+const providerOrders = new Map();
+const providerPayments = new Map();
+const checkoutSecret = "fixture-checkout-secret";
+let failProviderReads = false;
 let base;
 let app;
 let browser;
@@ -56,6 +60,8 @@ const rpc = {
     "p_size",
   ],
   expired_draft_media: ["p_owner", "p_draft"],
+  reserve_razorpay_test_order: ["p_owner_id", "p_invitation_id"],
+  claim_razorpay_test_reconciliation: ["p_owner_id", "p_id"],
   record_razorpay_test_payment: [
     "p_order_id",
     "p_payment_id",
@@ -64,6 +70,7 @@ const rpc = {
     "p_status",
     "p_owner_id",
     "p_event_id",
+    "p_request_sha256",
   ],
   publish_test_invitation: [
     "p_owner",
@@ -79,6 +86,7 @@ const scalarRpc = new Set([
   "reserve_draft_media",
   "register_draft_media",
   "record_razorpay_test_payment",
+  "claim_razorpay_test_reconciliation",
   "publish_test_invitation",
 ]);
 
@@ -104,6 +112,58 @@ const transport = createServer(async (req, res) => {
     return (await db.query(sql, params)).rows;
   }
   try {
+    if (url.pathname.startsWith("/v1/")) {
+      const basic = Buffer.from(
+        "rzp_test_Day06Fixture:" + checkoutSecret,
+      ).toString("base64");
+      assert.equal(req.headers.authorization, "Basic " + basic);
+      if (url.pathname === "/v1/orders" && req.method === "POST") {
+        const order = JSON.parse(await bytes(req));
+        assert.deepEqual(
+          {
+            amount: order.amount,
+            currency: order.currency,
+            partial: order.partial_payment,
+          },
+          { amount: 89900, currency: "INR", partial: false },
+        );
+        assert.match(order.receipt, /^test_[0-9a-f]{32}$/);
+        const id = "order_Day06Fixture" + (providerOrders.size + 1);
+        const created = {
+          id,
+          receipt: order.receipt,
+          amount: order.amount,
+          currency: order.currency,
+        };
+        providerOrders.set(id, created);
+        return send(200, created);
+      }
+      if (url.pathname === "/v1/orders") {
+        return send(200, {
+          items: [...providerOrders.values()].filter(
+            (order) => order.receipt === url.searchParams.get("receipt"),
+          ),
+        });
+      }
+      if (failProviderReads) return send(503, {});
+      const payment = url.pathname.match(/^\/v1\/payments\/([A-Za-z0-9_]+)$/);
+      if (payment) {
+        return providerPayments.has(payment[1])
+          ? send(200, providerPayments.get(payment[1]))
+          : send(404, {});
+      }
+      const order = url.pathname.match(
+        /^\/v1\/orders\/([A-Za-z0-9_]+)\/payments$/,
+      );
+      if (order) {
+        return send(200, {
+          items: [...providerPayments.values()].filter(
+            (payment) => payment.order_id === order[1],
+          ),
+        });
+      }
+      return send(404, {});
+    }
     if (url.pathname.startsWith("/test-media/")) {
       assert(url.searchParams.has("X-Amz-Signature"));
       res.setHeader("Access-Control-Allow-Origin", base);
@@ -181,14 +241,45 @@ const transport = createServer(async (req, res) => {
           [user.id, eq("id"), eq("status")],
         ),
       );
-    if (url.pathname === "/rest/v1/orders" && service)
+    if (url.pathname === "/rest/v1/orders" && service) {
+      if (req.method === "PATCH") {
+        const updates = JSON.parse(await bytes(req));
+        return send(
+          200,
+          await query(
+            "update public.orders set gateway_order_id=$4,status=$5,reservation_token=null,reservation_expires_at=null where id=$1 and owner_id=$2 and reservation_token=$3 and status='test_reserving' returning *",
+            [
+              eq("id"),
+              eq("owner_id"),
+              eq("reservation_token"),
+              updates.gateway_order_id,
+              updates.status,
+            ],
+          ),
+        );
+      }
       return send(
         200,
         await query(
-          "select * from public.orders where owner_id=$1 and (invitation_id=$2 or gateway_order_id=$3)",
+          "select * from public.orders where ($1::uuid is null or owner_id=$1) and (invitation_id=$2 or gateway_order_id=$3) and status in ('test_created','test_failed','test_processing','test_verified')",
           [eq("owner_id"), eq("invitation_id"), eq("gateway_order_id")],
         ),
       );
+    }
+    if (url.pathname === "/rest/v1/payment_events" && service) {
+      const filter = url.searchParams.get("or");
+      const match = filter?.match(
+        /^\(gateway_event_id\.eq\.([a-f0-9-]+),request_sha256\.eq\.([a-f0-9]{64})\)$/,
+      );
+      assert(match);
+      return send(
+        200,
+        await query(
+          "select gateway_event_id from public.payment_events where (gateway_event_id=$1 or request_sha256=$2) and processed_at is not null limit 1",
+          [match[1], match[2]],
+        ),
+      );
+    }
     if (url.pathname === "/rest/v1/draft_media_uploads" && service)
       return send(
         200,
@@ -218,7 +309,7 @@ const transport = createServer(async (req, res) => {
       (service || name === "get_published_invitation")
     ) {
       const input = JSON.parse(await bytes(req));
-      const args = rpc[name].map((key) => input[key]);
+      const args = rpc[name].map((key) => input[key] ?? null);
       const call = `public.${name}(${args.map((_, index) => "$" + (index + 1)).join(",")})`;
       const scalar = scalarRpc.has(name);
       const rows = await query(
@@ -235,7 +326,7 @@ const transport = createServer(async (req, res) => {
   }
 });
 
-function webhook(order, status, signatureValid = true) {
+function webhook(order, status, signatureValid = true, eventId = randomUUID()) {
   const raw = JSON.stringify({
     event: "payment." + status,
     payload: {
@@ -255,7 +346,7 @@ function webhook(order, status, signatureValid = true) {
     body: raw,
     headers: {
       "Content-Type": "application/json",
-      "X-Razorpay-Event-Id": randomUUID(),
+      "X-Razorpay-Event-Id": eventId,
       "X-Razorpay-Signature": createHmac("sha256", webhookSecret)
         .update(signatureValid ? raw : raw + " ")
         .digest("hex"),
@@ -351,7 +442,8 @@ try {
         R2_LOCAL_ENDPOINT: dataOrigin,
         RAZORPAY_KEY_ID: "rzp_test_Day06Fixture",
         NEXT_PUBLIC_RAZORPAY_KEY_ID: "rzp_test_Day06Fixture",
-        RAZORPAY_KEY_SECRET: "fixture-checkout-secret",
+        RAZORPAY_KEY_SECRET: checkoutSecret,
+        RAZORPAY_TEST_LOCAL_ENDPOINT: dataOrigin,
         RAZORPAY_WEBHOOK_SECRET: webhookSecret,
         STAGING_INVITATION_PUBLISHING: "true",
         SITE_URL: base,
@@ -405,6 +497,17 @@ try {
   const checkout = "/checkout/" + id;
   const review = "/publish/" + id;
   const endpoint = "/api/publish/" + id;
+  assert.equal(
+    (
+      await post(page, endpoint, {
+        title: "Incomplete fixture",
+        slug: "incomplete-fixture",
+        confirmed: true,
+        expectedVersion: 1,
+      })
+    ).status,
+    422,
+  );
   await page.getByLabel("Partner 1 name").fill("Tara");
   await page.getByLabel("Partner 2 name").fill("Neel");
   await page.getByLabel("Wedding timezone").fill("Asia/Kolkata");
@@ -413,6 +516,7 @@ try {
   await page.getByLabel("Date and time").fill("2027-12-12T10:00");
   await page.getByLabel("Venue name").fill("The Banyan Courtyard");
   await page.getByLabel("Venue address").fill("12 Fictional Lane, Jaipur");
+  await page.getByLabel("Map link").fill("https://maps.example.test/venue");
   await page
     .locator("#studio-photo-file")
     .setInputFiles(resolve(project, "public/invitations/heirloom-demo.jpg"));
@@ -420,6 +524,11 @@ try {
   await description.fill("A wedding invitation cover");
   await role(page, "button", "Save draft").click();
   await role(page, "link", "Continue to checkout").waitFor();
+  await page.reload();
+  await page.getByAltText("A wedding invitation cover").waitFor();
+  await role(page, "button", "Preview invitation").click();
+  await page.getByRole("complementary", { name: "Demo preview" }).waitFor();
+  await role(page, "button", "Back to editor").click();
   await shot(page, "02-studio-saved-photo");
   pass(
     "The sample led to account registration, a new draft, saved ceremony details and a verified cover upload.",
@@ -438,6 +547,15 @@ try {
     confirmed: true,
   };
   assert.equal((await post(page, endpoint, body)).status, 403);
+  assert.equal(
+    (await post(page, endpoint, { ...body, paid: true })).status,
+    400,
+  );
+  assert.equal(
+    (await post(page, endpoint, { ...body, ownerId: (await row()).owner_id }))
+      .status,
+    400,
+  );
   assert.equal((await fetch(guestUrl)).status, 404);
   assert.equal((await fetch(guestUrl + "/cover")).status, 404);
   assert.equal(
@@ -455,16 +573,16 @@ try {
   await strangerPage.goto(base + "/sign-in");
   await signUp(strangerPage, "day06-stranger");
   assert.equal((await post(strangerPage, endpoint, body)).status, 404);
+  const photoId = (await row()).data.coverImage.src.split("/").at(-1);
+  const privatePhoto = base + "/api/drafts/" + id + "/media/" + photoId;
+  assert.equal((await stranger.request.get(privatePhoto)).status(), 404);
+  assert.equal((await fetch(privatePhoto)).status, 401);
+  assert.equal((await fetch(base + "/api/drafts/" + id)).status, 401);
   await stranger.close();
   pass(
     "Unpaid, signed-out and cross-account publish requests were rejected. Unpublished page and cover returned 404.",
   );
 
-  const order = "order_Day06Fixture";
-  await db.query(
-    "insert into public.orders (invitation_id,owner_id,template_id,amount_paise,gateway_order_id,status) select id,owner_id,template_id,89900,$2,'test_created' from public.invitations where id=$1",
-    [id, order],
-  );
   await page.goto(base + checkout);
   await role(page, "button", "Open Razorpay Test Mode").click();
   await page
@@ -473,21 +591,93 @@ try {
     )
     .waitFor();
   assert.equal(await role(page, "link", "Review and publish").count(), 0);
-  const authorized = await db.query(
-    "select public.record_razorpay_test_payment($1, 'pay_Day06Fixture', 89900, 'INR', 'authorized', $2, null) as state",
-    [order, (await row()).owner_id],
+  const order = "order_Day06Fixture1";
+  assert.equal(providerOrders.size, 1);
+  const payment = {
+    id: "pay_Day06Fixture",
+    order_id: order,
+    amount: 89900,
+    currency: "INR",
+    status: "authorized",
+    captured: false,
+    amount_refunded: 0,
+    refund_status: null,
+  };
+  providerPayments.set(payment.id, payment);
+  const confirmation = {
+    razorpay_order_id: order,
+    razorpay_payment_id: payment.id,
+    razorpay_signature: createHmac("sha256", checkoutSecret)
+      .update(order + "|" + payment.id)
+      .digest("hex"),
+  };
+  assert.equal(
+    (await post(page, "/api/verify-payment", confirmation)).status,
+    409,
   );
-  assert.equal(authorized.rows[0].state, "processing");
   await page.getByText("Processing payment. Your draft is saved.").waitFor();
   await shot(page, "03-payment-processing");
   assert.equal((await webhook(order, "captured", false)).status, 401);
   assert.equal((await post(page, endpoint, body)).status, 403);
-  assert.equal((await webhook(order, "captured")).status, 204);
+  const eventId = randomUUID();
+  assert.equal((await webhook(order, "captured", true, eventId)).status, 503);
+  assert.equal(
+    (await db.query("select count(*)::int as count from public.payment_events"))
+      .rows[0].count,
+    0,
+  );
+
+  await page.goto(base + "/studio");
+  providerPayments.set(payment.id, {
+    ...payment,
+    status: "captured",
+    captured: true,
+  });
+  // Return in a clean browser context with the owner session but no callback/sessionStorage.
+  const returning = await browser.newContext({
+    storageState: await desktop.storageState(),
+  });
+  const returnPage = await returning.newPage();
+  await returnPage.goto(base + checkout);
+  await role(returnPage, "link", "Review and publish").waitFor({
+    timeout: 30000,
+  });
+  await returning.close();
+  await page.goto(base + checkout);
   await role(page, "link", "Review and publish").waitFor();
   assert.equal((await fetch(guestUrl)).status, 404);
+
+  failProviderReads = true;
+  assert.equal((await webhook(order, "captured", true, eventId)).status, 503);
+  failProviderReads = false;
+  const duplicate = await Promise.all([
+    webhook(order, "captured", true, eventId),
+    webhook(order, "captured", true, eventId),
+    webhook(order, "captured", true),
+  ]);
+  assert(duplicate.every((response) => response.status === 204));
+  const confirmed = await db.query(
+    "select status,gateway_payment_id,test_verification_source from public.orders where invitation_id=$1",
+    [id],
+  );
+  assert.deepEqual(confirmed.rows, [
+    {
+      status: "test_verified",
+      gateway_payment_id: payment.id,
+      test_verification_source: "owner_check",
+    },
+  ]);
+  assert.equal(
+    (
+      await db.query(
+        "select count(*)::int as count from public.payment_events where outcome='verified'",
+      )
+    ).rows[0].count,
+    1,
+  );
   await shot(page, "04-payment-verified");
   pass(
-    "A rejected browser callback and invalid webhook left the order private. Polling recovered after a signed test capture.",
+    "A server-priced order, invalid callback, authorization-only denial, delayed capture, owner return without sessionStorage, retryable outage and concurrent webhook replays passed.",
   );
   await role(page, "link", "Review and publish").click();
   await role(page, "link", "Edit draft").click();
@@ -570,6 +760,11 @@ try {
     new URL(await cover.getAttribute("src"), guestUrl).href,
     guestUrl + "/cover",
   );
+  const directions = publicPage.getByRole("link", { name: /Get directions/i });
+  assert.equal(
+    await directions.getAttribute("href"),
+    "https://maps.example.test/venue",
+  );
   const guestHtml = await publicPage.content();
   assert(
     !guestHtml.includes("/api/drafts/") && !guestHtml.includes("draft-media/"),
@@ -626,7 +821,7 @@ try {
     JSON.stringify(
       {
         environment:
-          "Loopback production build, PostgreSQL via PGlite, fixture Supabase Auth and R2, signed Razorpay webhook fixture",
+          "Loopback production build, PostgreSQL via PGlite, fixture Supabase Auth and R2, signed webhook and authoritative provider HTTP fixtures",
         routes: { editor, checkout, review, public: guestPath },
         checks,
       },
