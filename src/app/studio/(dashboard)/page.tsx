@@ -7,6 +7,8 @@ import { getServerAuth, requireStudioUser } from "@/lib/auth/server";
 import { canCreatePrivateDraft } from "@/lib/auth/service";
 import { draftIdSchema } from "@/lib/drafts/contract";
 import { listDrafts } from "@/lib/drafts/store";
+import { publishPath } from "@/lib/publish/contract";
+import { listOwnerPublications } from "@/lib/publish/store";
 import { getStorefrontCatalogue } from "@/lib/storefront-catalogue";
 import { signOut } from "../actions";
 
@@ -28,12 +30,15 @@ export default async function StudioPage({
   const query = await searchParams;
   const client = await getServerAuth();
   const cursor = draftIdSchema.safeParse(query.after);
-  const result = client
-    ? await listDrafts(
-        { client, ownerId: user.id },
-        cursor.success ? cursor.data : null,
-      ).catch(() => null)
-    : null;
+  const session = client && { client, ownerId: user.id };
+  const [result, publications] = session
+    ? await Promise.all([
+        listDrafts(session, cursor.success ? cursor.data : null).catch(
+          () => null,
+        ),
+        listOwnerPublications(session).catch(() => null),
+      ])
+    : [null, []];
   const catalogue = getStorefrontCatalogue();
   const firstDesign = catalogue[0];
 
@@ -136,6 +141,35 @@ export default async function StudioPage({
           </>
         )}
       </section>
+      {publications === null && (
+        <p role="alert">Couldn’t load published invitations.</p>
+      )}
+      {publications && publications.length > 0 && (
+        <section
+          aria-labelledby="published-heading"
+          className="studio-draft-list"
+        >
+          <h2 id="published-heading" className="font-editorial text-2xl">
+            Published invitations
+          </h2>
+          <ul className="studio-draft-list">
+            {publications.map((publication) => (
+              <li className="studio-draft-card" key={publication.id}>
+                <h3 className="font-editorial text-xl">
+                  {publication.test_publication_title}
+                </h3>
+                <Link
+                  className="studio-link"
+                  href={publishPath(publication.id)}
+                  prefetch={false}
+                >
+                  View and share
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </StudioShell>
   );
 }

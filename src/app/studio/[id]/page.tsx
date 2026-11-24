@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { StudioEditor } from "@/components/studio/StudioEditor";
 import { StudioShell } from "@/components/studio/StudioShell";
 import { getServerAuth, requireStudioUser } from "@/lib/auth/server";
@@ -8,6 +8,8 @@ import { canCreatePrivateDraft } from "@/lib/auth/service";
 import { draftIdSchema } from "@/lib/drafts/contract";
 import { loadDraft } from "@/lib/drafts/store";
 import { privateMediaConfigured } from "@/lib/media/storage";
+import { publishPath } from "@/lib/publish/contract";
+import { loadOwnerPublication } from "@/lib/publish/store";
 import { getStorefrontCatalogue } from "@/lib/storefront-catalogue";
 
 export const metadata: Metadata = {
@@ -41,7 +43,10 @@ export default async function DraftStudioPage({
         </div>
       </StudioShell>
     );
-  if (!result.draft) notFound();
+  if (!result.draft) {
+    if (await loadOwnerPublication(session, id)) redirect(publishPath(id));
+    notFound();
+  }
   const draft = result.draft;
 
   const templateName =
