@@ -1,0 +1,17 @@
+{
+  "environment": "Loopback production build, PostgreSQL via PGlite, fixture Supabase Auth and R2, genuine Razorpay Test Mode",
+  "routes": {
+    "editor": "/studio/ef61e00c-468c-4bd2-a272-f5b8409c9d52",
+    "checkout": "/checkout/ef61e00c-468c-4bd2-a272-f5b8409c9d52",
+    "review": "/publish/ef61e00c-468c-4bd2-a272-f5b8409c9d52",
+    "public": "/i/tara-neel-day-06"
+  },
+  "checks": [
+    "The sample led to account registration, a new draft, saved ceremony details and a verified cover upload.",
+    "Unpaid, signed-out and cross-account publish requests were rejected. Unpublished page and cover returned 404.",
+    "Razorpay Test Mode returned a genuine capture which the application verified before review.",
+    "The verified owner edited before publishing. An older review was rejected. Desktop copied the public URL.",
+    "Mobile copy and Web Share received the correct URL. A fresh anonymous context rendered the cover, metadata and invitation without a watermark.",
+    "The editor and Studio returned to sharing. Duplicate publish returned the original slug. Revocation and deletion removed the page and photo."
+  ]
+}
