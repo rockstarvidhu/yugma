@@ -69,6 +69,7 @@ jobs:
           done
           docker exec -i "$DB_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/auth_drafts.sql
           docker exec -i "$DB_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/private_draft_media.sql
+          docker exec -i "$DB_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/test_invitation_publication.sql
       - name: Rehearse schema export and draft restore
         env:
           DB_CONTAINER: ${{ job.services.postgres.id }}

@@ -14,7 +14,10 @@ export function Afterglow({
   invitation,
   trustedImageOrigin,
   privateDraftId,
+  publishedCover,
+  embedded,
 }: InvitationTemplateProps) {
+  const Page = embedded ? "div" : "main";
   const eventsByVenue = new Map<string, WeddingEvent[]>();
   for (const event of invitation.events) {
     const key = venueIdentity(event.venue);
@@ -24,9 +27,13 @@ export function Afterglow({
   }
 
   return (
-    <main className="afterglow-invitation">
+    <Page className="afterglow-invitation">
       {/* TODO(afterglow): envelope opening and cinematic reveals belong inside this template. */}
-      <Cover invitation={invitation} privateDraftId={privateDraftId} />
+      <Cover
+        invitation={invitation}
+        privateDraftId={privateDraftId}
+        publishedCover={publishedCover}
+      />
       <div className="afterglow-navigation">
         <QuickLinks scheduleId="celebration" venueId="venues" />
       </div>
@@ -77,6 +84,6 @@ export function Afterglow({
         closingNote={invitation.closingNote}
         hosts={invitation.hosts}
       />
-    </main>
+    </Page>
   );
 }

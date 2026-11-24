@@ -6,6 +6,8 @@ export function InvitationRenderer({
   invitation,
   trustedImageOrigin,
   privateDraftId,
+  publishedCover,
+  embedded,
   registry = templateRegistry,
 }: InvitationTemplateProps & {
   templateId: string;
@@ -20,6 +22,8 @@ export function InvitationRenderer({
       invitation={invitation}
       trustedImageOrigin={trustedImageOrigin}
       privateDraftId={privateDraftId}
+      publishedCover={publishedCover}
+      embedded={embedded}
     />
   );
 }

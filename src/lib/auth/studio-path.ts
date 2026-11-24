@@ -1,5 +1,5 @@
 const studioDraftPath =
-  /^\/(?:studio|checkout)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  /^\/(?:studio|checkout|publish)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const createPath = /^\/create\/[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
