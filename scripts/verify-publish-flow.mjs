@@ -62,6 +62,11 @@ const rpc = {
   expired_draft_media: ["p_owner", "p_draft"],
   reserve_razorpay_test_order: ["p_owner_id", "p_invitation_id"],
   claim_razorpay_test_reconciliation: ["p_owner_id", "p_id"],
+  authorize_razorpay_test_checkout: [
+    "p_owner_id",
+    "p_id",
+    "p_expected_payment_id",
+  ],
   record_razorpay_test_payment: [
     "p_order_id",
     "p_payment_id",
@@ -71,6 +76,7 @@ const rpc = {
     "p_owner_id",
     "p_event_id",
     "p_request_sha256",
+    "p_checked_at",
   ],
   publish_test_invitation: [
     "p_owner",
@@ -87,6 +93,7 @@ const scalarRpc = new Set([
   "register_draft_media",
   "record_razorpay_test_payment",
   "claim_razorpay_test_reconciliation",
+  "authorize_razorpay_test_checkout",
   "publish_test_invitation",
 ]);
 
@@ -275,7 +282,7 @@ const transport = createServer(async (req, res) => {
       return send(
         200,
         await query(
-          "select gateway_event_id from public.payment_events where (gateway_event_id=$1 or request_sha256=$2) and processed_at is not null limit 1",
+          "select outcome from public.payment_events where (gateway_event_id=$1 or request_sha256=$2) and processed_at is not null limit 2",
           [match[1], match[2]],
         ),
       );
@@ -327,20 +334,28 @@ const transport = createServer(async (req, res) => {
 });
 
 function webhook(order, status, signatureValid = true, eventId = randomUUID()) {
-  const raw = JSON.stringify({
-    event: "payment." + status,
-    payload: {
-      payment: {
-        entity: {
-          id: "pay_Day06Fixture",
-          order_id: order,
-          amount: 89900,
-          currency: "INR",
-          status,
+  return sendWebhook(
+    {
+      event: "payment." + status,
+      payload: {
+        payment: {
+          entity: {
+            id: "pay_Day06Fixture",
+            order_id: order,
+            amount: 89900,
+            currency: "INR",
+            status,
+          },
         },
       },
     },
-  });
+    signatureValid,
+    eventId,
+  );
+}
+
+function sendWebhook(payload, signatureValid = true, eventId = randomUUID()) {
+  const raw = JSON.stringify(payload);
   return fetch(base + "/api/webhooks/razorpay", {
     method: "POST",
     body: raw,
@@ -611,6 +626,19 @@ try {
       .update(order + "|" + payment.id)
       .digest("hex"),
   };
+  providerPayments.set(payment.id, { ...payment, status: "failed" });
+  assert.equal(
+    (await post(page, "/api/verify-payment", confirmation)).data.state,
+    "failed",
+  );
+  providerPayments.set(payment.id, payment);
+  assert.deepEqual(await post(page, "/api/create-order", { draftId: id }), {
+    status: 409,
+    data: { state: "processing" },
+  });
+  await page.reload();
+  await page.getByText("Processing payment. Your draft is saved.").waitFor();
+  assert.equal(await role(page, "button", "Retry test payment").count(), 0);
   assert.equal(
     (await post(page, "/api/verify-payment", confirmation)).status,
     409,
@@ -746,7 +774,9 @@ try {
     hasTouch: true,
   });
   const publicPage = await guest.newPage();
-  assert.equal((await publicPage.goto(guestUrl)).status(), 200);
+  const guestResponse = await publicPage.goto(guestUrl);
+  assert.equal(guestResponse.status(), 200);
+  assert.match(guestResponse.headers()["cache-control"], /no-store/);
   await role(publicPage, "heading", "Tara & Neel").waitFor();
   assert.equal(
     await publicPage
@@ -799,6 +829,100 @@ try {
   assert.equal(retry.data.slug, slug);
   await page.goto(base + "/studio");
   await role(page, "link", "View and share").waitFor();
+  const refundNotice = {
+    event: "refund.processed",
+    payload: {
+      payment: { entity: { ...payment, status: "captured" } },
+      refund: {
+        entity: {
+          id: "rfnd_Day06Partial",
+          payment_id: payment.id,
+          status: "processed",
+        },
+      },
+    },
+  };
+  const refundId = randomUUID();
+  providerPayments.set(payment.id, {
+    ...payment,
+    status: "captured",
+    captured: true,
+    amount_refunded: 150,
+    refund_status: "partial",
+  });
+  failProviderReads = true;
+  assert.equal((await sendWebhook(refundNotice, true, refundId)).status, 503);
+  const held = await guest.request.get(guestUrl);
+  assert.equal(held.status(), 404);
+  assert.match(held.headers()["cache-control"], /no-store/);
+  assert(!/og:title[^>]*Tara|draft-media\//.test(await held.text()));
+  assert.equal((await guest.request.get(guestUrl + "/cover")).status(), 404);
+  assert.equal((await post(page, endpoint, body)).status, 403);
+  failProviderReads = false;
+  assert.equal((await sendWebhook(refundNotice, true, refundId)).status, 204);
+  assert.equal((await sendWebhook(refundNotice, true, refundId)).status, 204);
+
+  providerPayments.set(payment.id, {
+    ...payment,
+    status: "captured",
+    captured: true,
+  });
+  assert.equal((await webhook(order, "captured")).status, 204);
+  assert.equal((await guest.request.get(guestUrl)).status(), 404);
+  await page.goto(base + review);
+  await role(page, "heading", "Guest access unavailable").waitFor();
+  await role(page, "heading", "Tara & Neel").waitFor();
+  const privateCover = page.getByAltText("A wedding invitation cover");
+  await privateCover.waitFor();
+  const privatePhotoUrl = new URL(await privateCover.getAttribute("src"), base)
+    .href;
+  assert.equal((await desktop.request.get(privatePhotoUrl)).status(), 200);
+  assert.equal((await guest.request.get(privatePhotoUrl)).status(), 401);
+  providerPayments.set(payment.id, {
+    ...payment,
+    status: "refunded",
+    captured: true,
+    amount_refunded: 89900,
+    refund_status: "full",
+  });
+  assert.equal(
+    (
+      await sendWebhook({
+        ...refundNotice,
+        payload: {
+          ...refundNotice.payload,
+          refund: {
+            entity: {
+              id: "rfnd_Day06Full",
+              payment_id: payment.id,
+              status: "processed",
+            },
+          },
+        },
+      })
+    ).status,
+    204,
+  );
+  assert.deepEqual(
+    (
+      await db.query(
+        "select o.status, o.test_entitlement, i.share_slug from public.orders o join public.invitations i on i.id=o.invitation_id where o.invitation_id=$1",
+        [id],
+      )
+    ).rows,
+    [
+      {
+        status: "test_verified",
+        test_entitlement: "revoked",
+        share_slug: slug,
+      },
+    ],
+  );
+  assert.equal((await guest.request.get(guestUrl)).status(), 404);
+  assert.equal((await guest.request.get(guestUrl + "/cover")).status(), 404);
+  pass(
+    "Late authorization held checkout after reload. Partial and full refunds removed guest content, metadata and cover while preserving the owner preview, receipt and slug.",
+  );
   await db.query("update public.invitations set status='revoked' where id=$1", [
     id,
   ]);

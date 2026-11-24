@@ -92,7 +92,7 @@ export function getTestGateway() {
     fetchPayment: (id: string) =>
       request("/v1/payments/" + encodeURIComponent(id)),
     fetchOrderPayments: (id: string) =>
-      request("/v1/orders/" + encodeURIComponent(id) + "/payments?count=10"),
+      request("/v1/orders/" + encodeURIComponent(id) + "/payments"),
   };
 }
 

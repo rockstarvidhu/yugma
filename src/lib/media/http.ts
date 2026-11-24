@@ -2,7 +2,7 @@ import "server-only";
 import { getVerifiedSession } from "@/lib/auth/server";
 import { createServiceClient } from "@/lib/auth/service";
 import { draftIdSchema } from "@/lib/drafts/contract";
-import { loadDraft } from "@/lib/drafts/store";
+import { loadDraft, loadOwnedPublishedInvitation } from "@/lib/drafts/store";
 import {
   completeUploadSchema,
   MAX_PHOTO_BYTES,
@@ -33,11 +33,20 @@ async function withOwnedDraft(
   draft: string,
   asset: string | undefined,
   operation: (session: Session, bucket: Storage) => Promise<Response>,
+  readPublished = false,
 ) {
   try {
     const session = await getVerifiedSession();
     if (!session) return failure(401, "Sign in to access your draft photos.");
-    if (!uuid(draft) || !(await loadDraft(session, draft)))
+    if (
+      !uuid(draft) ||
+      !(
+        (await loadDraft(session, draft)) ??
+        (readPublished
+          ? await loadOwnedPublishedInvitation(session, draft)
+          : null)
+      )
+    )
       return missingDraft();
     if (asset !== undefined && !uuid(asset)) return missingPhoto();
     const bucket = openStorage();
@@ -254,34 +263,39 @@ export function completeMedia(request: Request, draft: string, id: string) {
 }
 
 export function getMedia(draft: string, id: string) {
-  return withOwnedDraft(draft, id, async (session, bucket) => {
-    const size = await ownedAsset(session, draft, id);
-    if (!size) return missingPhoto();
+  return withOwnedDraft(
+    draft,
+    id,
+    async (session, bucket) => {
+      const size = await ownedAsset(session, draft, id);
+      if (!size) return missingPhoto();
 
-    const response = await bucket.final(draft, id);
-    if (response.status === 404) {
-      void response.body?.cancel().catch(() => undefined);
-      return missingPhoto();
-    }
-    if (
-      !response.ok ||
-      response.headers.get("content-type") !== "image/webp" ||
-      Number(response.headers.get("content-length")) !== size ||
-      !response.body
-    ) {
-      void response.body?.cancel().catch(() => undefined);
-      throw new Error("Private photo read failed");
-    }
+      const response = await bucket.final(draft, id);
+      if (response.status === 404) {
+        void response.body?.cancel().catch(() => undefined);
+        return missingPhoto();
+      }
+      if (
+        !response.ok ||
+        response.headers.get("content-type") !== "image/webp" ||
+        Number(response.headers.get("content-length")) !== size ||
+        !response.body
+      ) {
+        void response.body?.cancel().catch(() => undefined);
+        throw new Error("Private photo read failed");
+      }
 
-    return new Response(response.body, {
-      headers: {
-        ...headers,
-        "Content-Type": "image/webp",
-        "Content-Length": String(size),
-        "X-Content-Type-Options": "nosniff",
-        "Cross-Origin-Resource-Policy": "same-origin",
-        "Referrer-Policy": "no-referrer",
-      },
-    });
-  });
+      return new Response(response.body, {
+        headers: {
+          ...headers,
+          "Content-Type": "image/webp",
+          "Content-Length": String(size),
+          "X-Content-Type-Options": "nosniff",
+          "Cross-Origin-Resource-Policy": "same-origin",
+          "Referrer-Policy": "no-referrer",
+        },
+      });
+    },
+    true,
+  );
 }

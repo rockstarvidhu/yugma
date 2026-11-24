@@ -5,10 +5,11 @@ import { getVerifiedSession } from "@/lib/auth/server";
 import { createServiceClient } from "@/lib/auth/service";
 import { draftIdSchema } from "@/lib/drafts/contract";
 import { parseJson, readJsonBodyBytes } from "@/lib/http-json";
-import type { CheckoutOrder } from "./contract";
+import type { CheckoutOrder, CheckoutState } from "./contract";
 import { getTestGateway, matchesHmac, matchesSignature } from "./gateway";
 import {
   attachGatewayTestOrder,
+  authorizeTestCheckout,
   checkoutState,
   claimTestReconciliation,
   findTestOrder,
@@ -36,11 +37,13 @@ const signatureInput = z.strictObject({
     .length(64)
     .regex(/^[0-9a-f]{64}$/i),
 });
-const eventPayment = z.object({
+const paymentIdentity = z.object({
   id: paymentId,
   order_id: orderId.nullable(),
   amount: z.number().int().positive().max(2_147_483_647),
   currency: z.string().regex(/^[A-Z]{3}$/),
+});
+const eventPayment = paymentIdentity.extend({
   status: z.enum(["authorized", "captured", "failed"]),
 });
 // Webhook entities are snapshots. Only these fields from the live provider response
@@ -81,22 +84,80 @@ function paymentEvidence({
   ...payment
 }: ProviderPayment) {
   const status =
-    payment.amount_refunded > 0 || payment.refund_status
-      ? "ignored"
-      : payment.status === "captured" && payment.captured
-        ? "captured"
-        : !payment.captured &&
-            (payment.status === "authorized" || payment.status === "failed")
-          ? payment.status
-          : "ignored";
+    payment.amount_refunded === amount &&
+    (payment.refund_status == null || payment.refund_status === "full") &&
+    (payment.captured || payment.status === "refunded")
+      ? "revoked"
+      : payment.amount_refunded > 0 ||
+          payment.refund_status ||
+          payment.status === "refunded"
+        ? "suspended"
+        : payment.status === "captured" && payment.captured
+          ? "captured"
+          : !payment.captured &&
+              (payment.status === "authorized" ||
+                payment.status === "failed" ||
+                payment.status === "cancelled")
+            ? payment.status === "authorized"
+              ? "authorized"
+              : "failed"
+            : "ignored";
   return { id, order_id, amount, currency, status } as const;
 }
 
 const webhookInput = z.object({
-  event: z.enum(["payment.captured", "payment.failed", "order.paid"]),
+  event: z.enum([
+    "payment.authorized",
+    "payment.captured",
+    "payment.failed",
+    "order.paid",
+  ]),
   payload: z.object({ payment: z.object({ entity: eventPayment }) }),
 });
+const refundEntity = z.object({
+  entity: z.object({
+    id: z
+      .string()
+      .max(80)
+      .regex(/^rfnd_[A-Za-z0-9]+$/),
+    payment_id: paymentId,
+    status: z.enum(["pending", "processed", "failed"]),
+  }),
+});
+const disputeEntity = z.object({
+  entity: z.object({
+    id: z
+      .string()
+      .max(80)
+      .regex(/^disp_[A-Za-z0-9]+$/),
+    payment_id: paymentId,
+  }),
+});
+const financialWebhook = z.union([
+  z.object({
+    event: z.enum(["refund.created", "refund.processed", "refund.failed"]),
+    payload: z.object({
+      payment: z.object({ entity: paymentIdentity }),
+      refund: refundEntity,
+    }),
+  }),
+  z.object({
+    event: z.enum([
+      "payment.dispute.created",
+      "payment.dispute.under_review",
+      "payment.dispute.action_required",
+      "payment.dispute.lost",
+      "payment.dispute.won",
+      "payment.dispute.closed",
+    ]),
+    payload: z.object({
+      payment: z.object({ entity: paymentIdentity }),
+      dispute: disputeEntity,
+    }),
+  }),
+]);
 type Session = NonNullable<Awaited<ReturnType<typeof getVerifiedSession>>>;
+type ServiceClient = ReturnType<typeof createServiceClient>;
 
 function respond(data: unknown, status = 200) {
   return Response.json(data, {
@@ -107,6 +168,85 @@ function respond(data: unknown, status = 200) {
 
 function failure(status: number, error: string) {
   return respond({ error }, status);
+}
+
+function isCheckoutState(state: string): state is CheckoutState {
+  return [
+    "pending",
+    "verified",
+    "processing",
+    "failed",
+    "suspended",
+    "revoked",
+  ].includes(state);
+}
+
+async function getOrderEvidence(order: TestOrder) {
+  const result = orderPayments.parse(
+    await getTestGateway().fetchOrderPayments(order.gateway_order_id),
+  );
+  return result.items.map((item) => {
+    const payment = matchedPayment(item, order);
+    return payment ? paymentEvidence(payment) : null;
+  });
+}
+
+function bestEvidence(
+  evidence: Awaited<ReturnType<typeof getOrderEvidence>>,
+  order: TestOrder,
+) {
+  return (
+    evidence.find((item) => item?.status === "revoked") ??
+    evidence.find((item) => item?.status === "suspended") ??
+    evidence.find((item) => item?.status === "captured") ??
+    evidence.find((item) => item?.status === "authorized") ??
+    evidence.find(
+      (item) =>
+        item?.id === order.gateway_payment_id && item.status === "failed",
+    ) ??
+    evidence.find((item) => item?.status === "failed")
+  );
+}
+
+async function checkRetry(
+  db: ServiceClient,
+  ownerId: string,
+  order: TestOrder,
+) {
+  const current = checkoutState(order);
+  if (current !== "pending" && current !== "failed") return current;
+
+  const checkedAt = new Date().toISOString();
+  const evidence = await getOrderEvidence(order);
+  const candidate = bestEvidence(evidence, order);
+  if (candidate && candidate.status !== "failed") {
+    const state =
+      candidate.status === "authorized"
+        ? await recordTestPayment(db, candidate, { ownerId }, checkedAt)
+        : await recordTestPayment(db, candidate, { ownerId });
+    return isCheckoutState(state) ? state : "processing";
+  }
+  if (evidence.some((item) => item?.status !== "failed")) return "processing";
+  if (
+    current === "failed" &&
+    !evidence.some((item) => item?.id === order.gateway_payment_id)
+  )
+    return "processing";
+  if (
+    current === "pending" &&
+    candidate &&
+    (await recordTestPayment(db, candidate, { ownerId }, checkedAt)) !==
+      "failed"
+  )
+    return "processing";
+  return (await authorizeTestCheckout(
+    db,
+    ownerId,
+    order.id,
+    candidate?.id ?? null,
+  ))
+    ? "pending"
+    : "processing";
 }
 
 async function withCheckout<T>(
@@ -172,9 +312,10 @@ export function createOrder(request: Request) {
           "Checkout is still preparing your order. Try again shortly.",
         );
     }
-    const state = checkoutState(order);
-    if (state === "verified" || state === "processing")
-      return respond({ state }, 409);
+    const state = await checkRetry(db, session.ownerId, order).catch(
+      () => "processing" as const,
+    );
+    if (state !== "pending") return respond({ state }, 409);
     return respond({
       order_id: order.gateway_order_id,
       amount: order.amount_paise,
@@ -202,11 +343,13 @@ export function verifyPayment(request: Request) {
     )
       return failure(400, "Payment signature verification failed.");
 
-    if (order.status === "test_verified")
-      return order.gateway_payment_id === paymentId
-        ? respond({ success: true })
-        : failure(400, "This order has a different verified payment.");
+    if (
+      order.status === "test_verified" &&
+      order.gateway_payment_id !== paymentId
+    )
+      return failure(400, "This order has a different verified payment.");
 
+    const checkedAt = new Date().toISOString();
     const payment = matchedPayment(
       await fetchPayment(paymentId),
       order,
@@ -217,10 +360,13 @@ export function verifyPayment(request: Request) {
     const evidence = paymentEvidence(payment);
     if (evidence.status === "ignored")
       return respond({ state: "processing" }, 409);
-    const state = await recordTestPayment(db, evidence, { ownerId });
+    const state =
+      evidence.status === "authorized" || evidence.status === "failed"
+        ? await recordTestPayment(db, evidence, { ownerId }, checkedAt)
+        : await recordTestPayment(db, evidence, { ownerId });
     if (state === "verified") return respond({ success: true });
     if (state === "failed") return respond({ state });
-    if (state === "processing") return respond({ state }, 409);
+    if (isCheckoutState(state)) return respond({ state }, 409);
     return failure(409, "Checkout changed. Check your payment status.");
   });
 }
@@ -236,32 +382,36 @@ export async function getCheckoutStatus(draftId: string) {
     if (!order && !(await loadAfterglowCheckoutDraft(session, draftId)))
       return failure(404, "Draft unavailable for checkout.");
     const current = checkoutState(order);
-    if (!order || current === "verified") return respond({ state: current });
+    if (!order || current === "revoked") return respond({ state: current });
 
     if (!(await claimTestReconciliation(db, session.ownerId, order.id)))
       return respond({ state: current });
 
     try {
-      const result = orderPayments.parse(
-        await getTestGateway().fetchOrderPayments(order.gateway_order_id),
-      );
-      const evidence = result.items
-        .map((item) => matchedPayment(item, order))
-        .flatMap((payment) => (payment ? [paymentEvidence(payment)] : []));
-      const candidate =
-        evidence.find((item) => item.status === "captured") ??
-        evidence.find((item) => item.status === "authorized") ??
-        evidence.find((item) => item.status === "failed");
+      if (order.status === "test_verified" && order.gateway_payment_id) {
+        const payment = matchedPayment(
+          await getTestGateway().fetchPayment(order.gateway_payment_id),
+          order,
+          order.gateway_payment_id,
+        );
+        if (payment) {
+          const state = await recordTestPayment(db, paymentEvidence(payment), {
+            ownerId: session.ownerId,
+          });
+          if (isCheckoutState(state)) return respond({ state });
+        }
+        return respond({ state: current });
+      }
+      const checkedAt = new Date().toISOString();
+      const evidence = await getOrderEvidence(order);
+      const candidate = bestEvidence(evidence, order);
       if (candidate) {
-        const state = await recordTestPayment(db, candidate, {
-          ownerId: session.ownerId,
-        });
-        if (
-          state === "verified" ||
-          state === "processing" ||
-          state === "failed"
-        )
-          return respond({ state });
+        const source = { ownerId: session.ownerId };
+        const state =
+          candidate.status === "authorized" || candidate.status === "failed"
+            ? await recordTestPayment(db, candidate, source, checkedAt)
+            : await recordTestPayment(db, candidate, source);
+        if (isCheckoutState(state)) return respond({ state });
       }
     } catch {
       // A provider timeout must never unlock anything or erase the saved order state.
@@ -284,7 +434,16 @@ export async function razorpayWebhook(request: Request) {
     const eventId = request.headers.get("x-razorpay-event-id") ?? "";
     if (!/^[A-Za-z0-9_-]{1,128}$/.test(eventId))
       return failure(400, "Invalid webhook event ID.");
-    const input = webhookInput.safeParse(parseJson(body));
+    const payload = parseJson(body);
+    const financial = financialWebhook.safeParse(payload);
+    const input = webhookInput.safeParse(payload);
+    if (financial.success) {
+      return await handleFinancialWebhook(
+        financial.data,
+        eventId,
+        createHash("sha256").update(body).digest("hex"),
+      );
+    }
     if (!input.success) return failure(400, "Invalid webhook event.");
     const {
       event,
@@ -323,6 +482,7 @@ export async function razorpayWebhook(request: Request) {
       return acknowledged();
     }
 
+    const checkedAt = new Date().toISOString();
     const payment = matchedPayment(
       providerPayment.parse(await getTestGateway().fetchPayment(entity.id)),
       order,
@@ -339,13 +499,93 @@ export async function razorpayWebhook(request: Request) {
     ) {
       return failure(503, "Provider capture is pending. Retry delivery.");
     }
-    await recordTestPayment(
-      db,
-      evidence ?? { ...entity, status: "ignored" },
-      source,
-    );
-    return acknowledged();
+    const saved =
+      evidence?.status === "authorized" || evidence?.status === "failed"
+        ? await recordTestPayment(db, evidence, source, checkedAt)
+        : await recordTestPayment(
+            db,
+            evidence ?? { ...entity, status: "ignored" },
+            source,
+          );
+    return saved === "retry"
+      ? failure(503, "Checkout order matching is pending. Retry delivery.")
+      : acknowledged();
   } catch {
     return failure(503, "Couldn’t process the webhook. Retry delivery.");
   }
+}
+
+async function handleFinancialWebhook(
+  input: z.output<typeof financialWebhook>,
+  eventId: string,
+  digest: string,
+) {
+  const { entity } = input.payload.payment;
+  const reference =
+    "refund" in input.payload ? input.payload.refund : input.payload.dispute;
+  if (reference.entity.payment_id !== entity.id)
+    return failure(400, "Invalid webhook payment reference.");
+  if (
+    input.event === "refund.processed" &&
+    input.payload.refund.entity.status !== "processed"
+  )
+    return failure(400, "Invalid webhook refund status.");
+  const db = createServiceClient();
+  if (await recordedWebhook(db, eventId, digest))
+    return new Response(null, { status: 204 });
+  if (!entity.order_id) return new Response(null, { status: 204 });
+  const order = await findTestOrder(db, null, {
+    gatewayOrderId: entity.order_id,
+  });
+  if (!order)
+    return failure(503, "Checkout order matching is pending. Retry delivery.");
+  if (
+    entity.amount !== order.amount_paise ||
+    entity.currency !== order.currency ||
+    (order.status === "test_verified" && order.gateway_payment_id !== entity.id)
+  )
+    return failure(400, "Webhook does not match the checkout payment.");
+
+  const source = { eventId, digest };
+  // Only authenticated, order-bound notifications may apply this temporary hold.
+  // Leave the event retryable until a provider read completes.
+  const held = await recordTestPayment(
+    db,
+    { ...entity, status: "pending_review" },
+    source,
+  );
+  if (held === "duplicate") return new Response(null, { status: 204 });
+  if (held !== "awaiting_verification")
+    return failure(503, "Checkout order matching is pending. Retry delivery.");
+  const payment = matchedPayment(
+    await getTestGateway().fetchPayment(entity.id),
+    order,
+    entity.id,
+  );
+  if (!payment)
+    return failure(
+      503,
+      "Provider payment verification is pending. Retry delivery.",
+    );
+  const evidence = paymentEvidence(payment);
+  if (
+    input.event === "refund.processed" &&
+    evidence.status !== "revoked" &&
+    evidence.status !== "suspended"
+  )
+    return failure(
+      503,
+      "Provider refund verification is pending. Retry delivery.",
+    );
+  const saved = await recordTestPayment(
+    db,
+    {
+      ...evidence,
+      status: evidence.status === "revoked" ? "revoked" : "suspended",
+    },
+    source,
+  );
+  return saved === "retry"
+    ? failure(503, "Checkout order matching is pending. Retry delivery.")
+    : new Response(null, { status: 204 });
 }

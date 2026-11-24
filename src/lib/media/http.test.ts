@@ -8,6 +8,7 @@ import { InvalidPhoto, normalizePhoto } from "./image";
 const m = vi.hoisted(() => ({
   getSession: vi.fn(),
   loadDraft: vi.fn(),
+  loadOwnedPublishedInvitation: vi.fn(),
   rpc: vi.fn(),
   lookup: vi.fn(),
   owned: vi.fn(),
@@ -20,7 +21,10 @@ const m = vi.hoisted(() => ({
 }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/auth/server", () => ({ getVerifiedSession: m.getSession }));
-vi.mock("@/lib/drafts/store", () => ({ loadDraft: m.loadDraft }));
+vi.mock("@/lib/drafts/store", () => ({
+  loadDraft: m.loadDraft,
+  loadOwnedPublishedInvitation: m.loadOwnedPublishedInvitation,
+}));
 vi.mock("@/lib/auth/service", () => ({
   createServiceClient: () => ({
     rpc: m.rpc,

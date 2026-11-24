@@ -20,10 +20,19 @@ insert into public.orders (invitation_id, owner_id, template_id, amount_paise, g
   select id, owner_id, template_id, 89900, case right(id::text, 1) when '1' then 'order_One' else 'order_Two' end,
     'test_created' from public.invitations where owner_id = 'c1000000-0000-4000-8000-000000000001';
 
+create function yugma_private.fail_fixture_event_outcome() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if new.gateway_event_id = 'evt_fixture_write_failure' then raise sqlstate 'P9002'; end if;
+  return new;
+end $$;
+create trigger fail_fixture_event_outcome before update on public.payment_events
+  for each row execute function yugma_private.fail_fixture_event_outcome();
+
 set local role authenticated;
 do $$ begin
   if has_function_privilege('public.claim_razorpay_test_reconciliation(uuid,uuid)', 'EXECUTE')
-    or has_function_privilege('public.record_razorpay_test_payment(text,text,integer,text,text,uuid,text,text)', 'EXECUTE')
+    or has_function_privilege('public.record_razorpay_test_payment(text,text,integer,text,text,uuid,text,text,timestamptz)', 'EXECUTE')
     or has_table_privilege('public.orders', 'UPDATE') or has_table_privilege('public.payment_events', 'INSERT')
     then raise exception 'Authenticated actor can grant entitlement'; end if;
 end $$;
@@ -59,6 +68,16 @@ begin
   if exists (select 1 from public.payment_events where gateway_event_id = 'evt_capture')
     or exists (select 1 from public.orders where id = receipt and status = 'test_verified')
   then raise exception 'Rollback did not undo the entitlement and event together'; end if;
+
+  begin
+    perform public.record_razorpay_test_payment('order_One','pay_One',89900,'INR','captured',
+      null,'evt_fixture_write_failure',repeat('5',64));
+    raise exception 'Injected event write did not fail';
+  exception when sqlstate 'P9002' then null;
+  end;
+  if exists (select 1 from public.payment_events where gateway_event_id = 'evt_fixture_write_failure')
+    or exists (select 1 from public.orders where id = receipt and status = 'test_verified')
+  then raise exception 'A failed event write left a partial capture'; end if;
 
   if public.record_razorpay_test_payment('order_One','pay_One',89900,'INR','captured',null,'evt_capture',repeat('a',64)) <> 'verified'
     or public.record_razorpay_test_payment('order_One','pay_One',89900,'INR','captured',null,'evt_capture',repeat('a',64)) <> 'duplicate'

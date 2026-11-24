@@ -5,9 +5,10 @@ import { StudioShell } from "@/components/studio/StudioShell";
 import { InvitationRenderer } from "@/invitations/renderer/InvitationRenderer";
 import { getServerAuth, requireStudioUser } from "@/lib/auth/server";
 import { createServiceClient } from "@/lib/auth/service";
-import { findTestOrder } from "@/lib/checkout/store";
+import { getCheckoutStatus } from "@/lib/checkout/http";
+import { checkoutState, findTestOrder } from "@/lib/checkout/store";
 import { draftIdSchema } from "@/lib/drafts/contract";
-import { loadDraft } from "@/lib/drafts/store";
+import { loadDraft, loadOwnedPublishedInvitation } from "@/lib/drafts/store";
 import { invitationSchema } from "@/lib/invitation-schema";
 import { invitationTitle, publishPath } from "@/lib/publish/contract";
 import {
@@ -47,7 +48,21 @@ export default async function PublishPage({
     );
 
   const [publication, draft] = loaded;
-  if (publication)
+  const order = await Promise.resolve()
+    .then(() => findTestOrder(createServiceClient(), user.id, { draftId: id }))
+    .then((saved) => ({ saved }))
+    .catch(() => null);
+  let state = checkoutState(order?.saved ?? null);
+  if (publication && order?.saved?.test_entitlement === "unconfirmed") {
+    const response = await getCheckoutStatus(id);
+    if (response.ok) {
+      const latest: { state?: string } = await response.json();
+      if (latest.state === "verified") state = "verified";
+    }
+  }
+  const verified = state === "verified";
+
+  if (publication && verified)
     return (
       <StudioShell
         title="Invitation published"
@@ -63,13 +78,28 @@ export default async function PublishPage({
         />
       </StudioShell>
     );
+  if (publication) {
+    const saved = await loadOwnedPublishedInvitation(session, id);
+    const invitation = invitationSchema.safeParse(saved?.data);
+    return (
+      <StudioShell title="Guest access unavailable">
+        <p>
+          Only you can see this invitation here. Your share link is reserved
+          while guest access is disabled.
+        </p>
+        {invitation.success && saved && (
+          <InvitationRenderer
+            templateId={saved.templateKey}
+            invitation={invitation.data}
+            privateDraftId={id}
+            embedded
+          />
+        )}
+      </StudioShell>
+    );
+  }
   if (!draft || draft.templateKey !== "afterglow") notFound();
 
-  const order = await Promise.resolve()
-    .then(() => findTestOrder(createServiceClient(), user.id, { draftId: id }))
-    .then((saved) => ({ saved }))
-    .catch(() => null);
-  const verified = order?.saved?.status === "test_verified";
   const invitation = invitationSchema.safeParse(draft.data);
   const title = invitation.success
     ? invitationTitle(invitation.data.couple)
@@ -97,9 +127,11 @@ export default async function PublishPage({
         ) : (
           <>
             <p>
-              {order
-                ? "Verify your test payment to publish this invitation."
-                : "Payment status is temporarily unavailable."}
+              {state === "suspended" || state === "revoked"
+                ? "Guest access is disabled for this test payment. Your draft is saved."
+                : order
+                  ? "Verify your test payment to publish this invitation."
+                  : "Payment status is temporarily unavailable."}
             </p>
             <Link
               className="studio-link"
