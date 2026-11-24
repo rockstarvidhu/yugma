@@ -3,12 +3,15 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import Razorpay from "razorpay";
 
 export function getRazorpayTestConfig() {
-  const keyId = process.env.RAZORPAY_KEY_ID;
-  const keySecret = process.env.RAZORPAY_KEY_SECRET;
+  const {
+    RAZORPAY_KEY_ID: keyId,
+    RAZORPAY_KEY_SECRET: keySecret,
+    NEXT_PUBLIC_RAZORPAY_KEY_ID: publicKeyId,
+  } = process.env;
   if (
     !keyId ||
     !/^rzp_test_[A-Za-z0-9]+$/.test(keyId) ||
-    keyId !== process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ||
+    keyId !== publicKeyId ||
     !keySecret
   ) {
     return null;

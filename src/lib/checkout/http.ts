@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getVerifiedSession } from "@/lib/auth/server";
 import { createServiceClient } from "@/lib/auth/service";
 import { draftIdSchema } from "@/lib/drafts/contract";
+import { parseJson, readJsonBodyBytes } from "@/lib/http-json";
 import type { CheckoutOrder } from "./contract";
 import { getTestGateway, matchesHmac, matchesSignature } from "./gateway";
 import {
@@ -55,46 +56,6 @@ function failure(status: number, error: string) {
   return respond({ error }, status);
 }
 
-async function readBody(request: Request, maxBytes: number) {
-  const contentType = request.headers
-    .get("content-type")
-    ?.split(";")[0]
-    ?.trim()
-    .toLowerCase();
-  if (contentType !== "application/json" || !request.body) return null;
-  if (Number(request.headers.get("content-length")) > maxBytes) return null;
-
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let bytes = 0;
-  try {
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      bytes += value.byteLength;
-      if (bytes > maxBytes) {
-        void reader.cancel().catch(() => undefined);
-        return null;
-      }
-      chunks.push(value);
-    }
-    return Buffer.concat(chunks, bytes);
-  } catch {
-    return null;
-  } finally {
-    reader.releaseLock();
-  }
-}
-
-function parseJson(body: Uint8Array | null): unknown {
-  if (!body) return null;
-  try {
-    return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(body));
-  } catch {
-    return null;
-  }
-}
-
 async function withCheckout<T>(
   request: Request,
   schema: z.ZodType<T>,
@@ -103,7 +64,9 @@ async function withCheckout<T>(
   try {
     const session = await getVerifiedSession();
     if (!session) return failure(401, "Sign in to use checkout.");
-    const input = schema.safeParse(parseJson(await readBody(request, 4096)));
+    const input = schema.safeParse(
+      parseJson(await readJsonBodyBytes(request, 4096)),
+    );
     if (!input.success) return failure(400, "The checkout request is invalid.");
     return await operation(session, input.data);
   } catch {
@@ -246,7 +209,7 @@ export async function razorpayWebhook(request: Request) {
   if (!secret || secret === process.env.RAZORPAY_KEY_SECRET)
     return failure(503, "Webhook unavailable.");
   try {
-    const body = await readBody(request, 256 * 1024);
+    const body = await readJsonBodyBytes(request, 256 * 1024);
     const signature = request.headers.get("x-razorpay-signature") ?? "";
     if (!body || !matchesHmac(body, signature, secret))
       return failure(401, "Invalid webhook signature.");

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { StudioShell } from "@/components/studio/StudioShell";
 import { getServerAuth, requireStudioUser } from "@/lib/auth/server";
 import { canCreatePrivateDraft, createServiceClient } from "@/lib/auth/service";
@@ -14,6 +14,11 @@ import {
 } from "@/lib/checkout/store";
 import { draftIdSchema } from "@/lib/drafts/contract";
 import { loadDraft } from "@/lib/drafts/store";
+import { publishPath } from "@/lib/publish/contract";
+import {
+  loadOwnerPublication,
+  stagingPublishingEnabled,
+} from "@/lib/publish/store";
 import { getStorefrontCatalogue } from "@/lib/storefront-catalogue";
 import { CheckoutButton } from "./CheckoutButton";
 import "./checkout.css";
@@ -51,7 +56,10 @@ export default async function CheckoutPage({
       </StudioShell>
     );
   const [draft, eligible] = loaded;
-  if (!draft) notFound();
+  if (!draft) {
+    if (await loadOwnerPublication(session, id)) redirect(publishPath(id));
+    notFound();
+  }
   const template = getStorefrontCatalogue().find(
     ({ templateId }) => templateId === draft.templateKey,
   );
@@ -164,6 +172,9 @@ export default async function CheckoutPage({
               currency={currency}
               initialState={initialState}
               keyId={keyId}
+              publishUrl={
+                stagingPublishingEnabled() ? publishPath(id) : undefined
+              }
             />
           ) : (
             <p role="status">

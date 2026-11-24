@@ -51,3 +51,5 @@ next-env.d.ts
 # Candidate photography and rendered evidence are for local editorial review.
 /assets/storefront-hero-review/
 /artifacts/storefront-editorial/private/
+/artifacts/day-06/
+/supabase/.temp/

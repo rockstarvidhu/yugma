@@ -54,12 +54,14 @@ export function CheckoutButton({
   currency,
   initialState,
   keyId,
+  publishUrl,
 }: {
   draftId: string;
   amount: number;
   currency: string;
   initialState: CheckoutState;
   keyId?: string;
+  publishUrl?: string;
 }) {
   const router = useRouter();
   const [ready, setReady] = useState(false);
@@ -176,7 +178,7 @@ export function CheckoutButton({
         state?: CheckoutState;
       }>("/api/verify-payment", payment);
       if (status === 401) setSignIn(true);
-      else if (ok && data.success) finishVerification("verified");
+      else if (ok && data.success === true) await refreshStatus();
       else if (ok && data.state === "failed") finishVerification("failed");
       else if (status === 400 || status === 404) {
         remember();
@@ -213,7 +215,7 @@ export function CheckoutButton({
       if (!ok) {
         if (status === 401) setSignIn(true);
         else if (status === 409) {
-          if (data.state === "verified") finishVerification("verified");
+          if (data.state === "verified") await refreshStatus();
           else if (data.state === "processing") setState("processing");
           else router.refresh();
         } else setMessage(data.error ?? "Couldn’t start checkout. Try again.");
@@ -242,7 +244,7 @@ export function CheckoutButton({
         name: "YUGMA",
         description: "Afterglow invitation (test)",
         handler: (payment) => {
-          if (submitted) return;
+          if (submitted || payment.razorpay_order_id !== data.order_id) return;
           submitted = true;
           launching.current = false;
           void verify(payment);
@@ -304,6 +306,15 @@ export function CheckoutButton({
           : message || statusCopy[state]}
       </p>
       {state === "processing" && message && <p role="status">{message}</p>}
+      {state === "verified" && publishUrl && (
+        <Link
+          className="studio-primary-link justify-self-start"
+          href={publishUrl}
+          prefetch={false}
+        >
+          Review and publish
+        </Link>
+      )}
       {signIn ? (
         <Link className="studio-link justify-self-start" href={signInUrl}>
           Sign in to resume checkout
@@ -319,14 +330,17 @@ export function CheckoutButton({
               Retry verification
             </Button>
           )}
-          {!confirmation &&
-            (state === "pending" ||
-              state === "failed" ||
-              state === "processing") && (
-              <Button variant="secondary" disabled={busy} onClick={checkStatus}>
-                Check payment status
-              </Button>
-            )}
+          {(state === "pending" ||
+            state === "failed" ||
+            state === "processing") && (
+            <Button
+              variant="secondary"
+              disabled={busy}
+              onClick={confirmation ? () => void refreshStatus() : checkStatus}
+            >
+              Check payment status
+            </Button>
+          )}
         </>
       )}
     </div>

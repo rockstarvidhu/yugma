@@ -2,17 +2,28 @@
 
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { signIn } from "./actions";
+import { signIn, signUp } from "./actions";
 
 const inputClass =
   "w-full rounded-sm border border-current/30 bg-white p-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
 
-export function SignInForm({ returnTo }: { returnTo: string }) {
-  const [error, action, pending] = useActionState(signIn, null);
+export function SignInForm({
+  returnTo,
+  creating = false,
+}: {
+  returnTo: string;
+  creating?: boolean;
+}) {
+  const [error, signInAction, signingIn] = useActionState(signIn, null);
+  const [registration, signUpAction, signingUp] = useActionState(signUp, null);
+  const pending = creating ? signingUp : signingIn;
   const [email, setEmail] = useState("");
 
   return (
-    <form action={action} className="grid gap-4">
+    <form
+      action={creating ? signUpAction : signInAction}
+      className="grid gap-4"
+    >
       <input type="hidden" name="next" value={returnTo} />
       <label className="grid gap-1">
         Email address
@@ -32,13 +43,26 @@ export function SignInForm({ returnTo }: { returnTo: string }) {
           className={inputClass}
           type="password"
           name="password"
-          autoComplete="current-password"
+          autoComplete={creating ? "new-password" : "current-password"}
+          minLength={creating ? 8 : undefined}
           required
         />
       </label>
-      {error && <p role="alert">{error}</p>}
+      {creating
+        ? registration && (
+            <p role={registration.confirmed ? "status" : "alert"}>
+              {registration.message}
+            </p>
+          )
+        : error && <p role="alert">{error}</p>}
       <Button type="submit" disabled={pending}>
-        {pending ? "Signing in…" : "Sign in"}
+        {creating
+          ? pending
+            ? "Creating account…"
+            : "Create account"
+          : pending
+            ? "Signing in…"
+            : "Sign in"}
       </Button>
     </form>
   );

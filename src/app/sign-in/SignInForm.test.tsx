@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { signIn } from "./actions";
 import { SignInForm } from "./SignInForm";
 
-vi.mock("./actions", () => ({ signIn: vi.fn() }));
+vi.mock("./actions", () => ({ signIn: vi.fn(), signUp: vi.fn() }));
 afterEach(cleanup);
 
 it("keeps the email and clears the password after a rejected sign-in", async () => {

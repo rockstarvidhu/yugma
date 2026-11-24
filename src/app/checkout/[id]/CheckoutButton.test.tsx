@@ -91,7 +91,8 @@ describe("Studio Test Mode checkout", () => {
   it("opens the Razorpay modal with the server order and verifies the callback", async () => {
     fetcher
       .mockResolvedValueOnce(Response.json(order))
-      .mockResolvedValueOnce(Response.json({ success: true }));
+      .mockResolvedValueOnce(Response.json({ success: true }))
+      .mockResolvedValueOnce(Response.json({ state: "verified" }));
     fireEvent.click(renderCheckout());
     await waitFor(() => expect(open).toHaveBeenCalledOnce());
     expect(options).toMatchObject({
@@ -147,7 +148,8 @@ describe("Studio Test Mode checkout", () => {
       .mockResolvedValueOnce(
         Response.json({ error: "Awaiting capture." }, { status: 409 }),
       )
-      .mockResolvedValueOnce(Response.json({ success: true }));
+      .mockResolvedValueOnce(Response.json({ success: true }))
+      .mockResolvedValueOnce(Response.json({ state: "verified" }));
     fireEvent.click(renderCheckout());
     await waitFor(() => expect(open).toHaveBeenCalledOnce());
     act(() => options.handler(confirmation));
@@ -162,6 +164,7 @@ describe("Studio Test Mode checkout", () => {
       "/api/create-order",
       "/api/verify-payment",
       "/api/verify-payment",
+      `/api/checkout/${draftId}`,
     ]);
   });
 
@@ -170,7 +173,9 @@ describe("Studio Test Mode checkout", () => {
       `yugma:checkout:${draftId}`,
       JSON.stringify(confirmation),
     );
-    fetcher.mockResolvedValueOnce(Response.json({ success: true }));
+    fetcher
+      .mockResolvedValueOnce(Response.json({ success: true }))
+      .mockResolvedValueOnce(Response.json({ state: "verified" }));
     render(
       <CheckoutButton
         draftId={draftId}
@@ -208,6 +213,7 @@ describe("Studio Test Mode checkout", () => {
           currency={order.currency}
           initialState="processing"
           keyId={keyId}
+          publishUrl={`/publish/${draftId}`}
         />,
       );
       expect(screen.getByRole("status")).toHaveTextContent(
@@ -218,8 +224,14 @@ describe("Studio Test Mode checkout", () => {
       ).not.toBeInTheDocument();
       await act(() => vi.advanceTimersByTimeAsync(2500));
       expect(screen.queryByText(verifiedCopy)).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("link", { name: "Review and publish" }),
+      ).not.toBeInTheDocument();
       await act(() => vi.advanceTimersByTimeAsync(5000));
       expect(screen.getByText(verifiedCopy)).toBeVisible();
+      expect(
+        screen.getByRole("link", { name: "Review and publish" }),
+      ).toHaveAttribute("href", `/publish/${draftId}`);
       expect(fetcher).toHaveBeenNthCalledWith(
         2,
         `/api/checkout/${draftId}`,
