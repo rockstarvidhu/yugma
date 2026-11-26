@@ -72,18 +72,31 @@ export async function listDrafts(
   };
 }
 
-export async function loadDraft({ client, ownerId }: DraftReader, id: string) {
-  const { data, error } = await client
+async function loadOwnedInvitation(
+  { client, ownerId }: DraftReader,
+  id: string,
+  status: "draft" | "published",
+) {
+  const query = client
     .from("invitations")
     .select(ownerColumns)
     .eq("id", id)
     .eq("owner_id", ownerId)
-    .eq("status", "draft")
-    .maybeSingle();
+    .eq("status", status);
+  if (status === "published") query.not("test_publication_title", "is", null);
+  const { data, error } = await query.maybeSingle();
   if (error) throw error;
   if (!data) return null;
   const row = ownerRow.parse(data);
   return toDraft(row, row.template.registry_key);
+}
+
+export function loadDraft(reader: DraftReader, id: string) {
+  return loadOwnedInvitation(reader, id, "draft");
+}
+
+export function loadOwnedPublishedInvitation(reader: DraftReader, id: string) {
+  return loadOwnedInvitation(reader, id, "published");
 }
 
 export async function createDraft(

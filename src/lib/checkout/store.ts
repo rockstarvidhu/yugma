@@ -55,7 +55,7 @@ export async function loadAfterglowCheckoutDraft(
 }
 
 const orderColumns =
-  "id,gateway_order_id,gateway_payment_id,amount_paise,currency,status";
+  "id,gateway_order_id,gateway_payment_id,amount_paise,currency,status,test_entitlement";
 const states = {
   test_created: "pending",
   test_failed: "failed",
@@ -71,24 +71,83 @@ const testOrderSchema = z.object({
   amount_paise: z.number().int().min(100),
   currency: z.literal(CHECKOUT_CURRENCY),
   status: orderStatus,
+  test_entitlement: z
+    .enum(["unconfirmed", "active", "suspended", "revoked"])
+    .nullable(),
 });
 
 export function checkoutState(
   order: z.output<typeof testOrderSchema> | null,
 ): CheckoutState {
-  return order ? states[order.status] : "ready";
+  if (!order) return "ready";
+  if (order.test_entitlement === "revoked") return "revoked";
+  if (
+    order.test_entitlement === "suspended" ||
+    (order.status === "test_verified" && order.test_entitlement !== "active")
+  )
+    return "suspended";
+  return states[order.status];
+}
+
+export type TestOrder = z.output<typeof testOrderSchema>;
+
+export type TestPaymentEvidence = {
+  id: string;
+  order_id: string | null;
+  amount: number;
+  currency: string;
+  status:
+    | "authorized"
+    | "captured"
+    | "failed"
+    | "ignored"
+    | "suspended"
+    | "revoked"
+    | "pending_review";
+};
+
+const reconciledOrder = z.object({
+  paymentId: z.string().nullable(),
+  state: z.enum([
+    "pending",
+    "failed",
+    "processing",
+    "verified",
+    "suspended",
+    "revoked",
+  ]),
+});
+
+export async function reconcileTestAttempts(
+  db: ServiceClient,
+  order: TestOrder,
+  ownerId: string,
+  attempts: TestPaymentEvidence[],
+  checkedAt: string,
+) {
+  if (!attempts.length)
+    return { state: checkoutState(order), paymentId: order.gateway_payment_id };
+  const { data, error } = await db.rpc("reconcile_razorpay_test_attempts", {
+    p_owner_id: ownerId,
+    p_order_id: order.gateway_order_id,
+    p_attempts: attempts,
+    p_checked_at: checkedAt,
+  });
+  if (error) throw error;
+  return reconciledOrder.parse(data);
 }
 
 export async function findTestOrder(
   db: ServiceClient,
-  ownerId: string,
+  ownerId: string | null,
   match: { draftId: string } | { gatewayOrderId: string },
 ) {
+  if (ownerId === null && "draftId" in match) return null;
   const query = db
     .from("orders")
     .select(orderColumns)
-    .eq("owner_id", ownerId)
     .in("status", orderStatus.options);
+  if (ownerId !== null) query.eq("owner_id", ownerId);
   const { data, error } = await (
     "draftId" in match
       ? query.eq("invitation_id", match.draftId)
@@ -96,6 +155,52 @@ export async function findTestOrder(
   ).maybeSingle();
   if (error) throw error;
   return data ? testOrderSchema.parse(data) : null;
+}
+
+export async function recordedWebhook(
+  db: ServiceClient,
+  eventId: string,
+  digest: string,
+) {
+  const { data, error } = await db
+    .from("payment_events")
+    .select("outcome")
+    .or("gateway_event_id.eq." + eventId + ",request_sha256.eq." + digest)
+    .not("processed_at", "is", null)
+    .limit(2);
+  if (error) throw error;
+  return z
+    .array(z.object({ outcome: z.string().nullable() }))
+    .parse(data)
+    .some(({ outcome }) => outcome !== "legacy_unbound");
+}
+
+export async function claimTestReconciliation(
+  db: ServiceClient,
+  ownerId: string,
+  orderId: string,
+) {
+  const { data, error } = await db.rpc("claim_razorpay_test_reconciliation", {
+    p_owner_id: ownerId,
+    p_id: orderId,
+  });
+  if (error) throw error;
+  return z.boolean().parse(data);
+}
+
+export async function authorizeTestCheckout(
+  db: ServiceClient,
+  ownerId: string,
+  orderId: string,
+  paymentId: string | null,
+) {
+  const { data, error } = await db.rpc("authorize_razorpay_test_checkout", {
+    p_owner_id: ownerId,
+    p_id: orderId,
+    p_expected_payment_id: paymentId,
+  });
+  if (error) throw error;
+  return z.boolean().parse(data);
 }
 
 const reservationSchema = z.object({
@@ -147,14 +252,9 @@ export async function attachGatewayTestOrder(
 
 export async function recordTestPayment(
   db: ServiceClient,
-  payment: {
-    id: string;
-    order_id: string | null;
-    amount: number;
-    currency: string;
-    status: "authorized" | "captured" | "failed";
-  },
-  source: { ownerId: string } | { eventId: string },
+  payment: TestPaymentEvidence,
+  source: { ownerId: string } | { eventId: string; digest: string },
+  checkedAt?: string,
 ) {
   const { data, error } = await db.rpc("record_razorpay_test_payment", {
     p_order_id: payment.order_id,
@@ -164,9 +264,21 @@ export async function recordTestPayment(
     p_status: payment.status,
     p_owner_id: "ownerId" in source ? source.ownerId : null,
     p_event_id: "eventId" in source ? source.eventId : null,
+    p_request_sha256: "digest" in source ? source.digest : null,
+    p_checked_at: checkedAt ?? null,
   });
   if (error) throw error;
   return z
-    .enum(["failed", "processing", "verified", "ignored", "duplicate"])
+    .enum([
+      "failed",
+      "processing",
+      "verified",
+      "ignored",
+      "duplicate",
+      "suspended",
+      "revoked",
+      "awaiting_verification",
+      "retry",
+    ])
     .parse(data);
 }

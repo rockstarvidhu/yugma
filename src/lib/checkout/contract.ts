@@ -8,7 +8,13 @@ export type CheckoutOrder = {
 };
 
 export type CheckoutState =
-  "ready" | "pending" | "failed" | "processing" | "verified";
+  | "ready"
+  | "pending"
+  | "failed"
+  | "processing"
+  | "verified"
+  | "suspended"
+  | "revoked";
 
 export type CheckoutConfirmation = {
   razorpay_payment_id: string;

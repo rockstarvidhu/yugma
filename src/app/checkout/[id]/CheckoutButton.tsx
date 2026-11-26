@@ -42,10 +42,14 @@ async function post<T>(url: string, body: object) {
 const statusCopy: Record<CheckoutState, string> = {
   ready: "",
   pending: "Checkout started. You can resume with your saved draft.",
-  failed: "Test payment failed. You can try again.",
+  failed: "Test payment failed. We’ll check its status before you retry.",
   processing: "Processing payment. Your draft is saved.",
   verified:
     "Test payment verified. No money was charged. Your invitation is still private.",
+  suspended:
+    "Publication is on hold while this test payment is reviewed. Your invitation is saved.",
+  revoked:
+    "This test payment was refunded. Your invitation is saved and guest access is disabled.",
 };
 
 export function CheckoutButton({
@@ -88,8 +92,12 @@ export function CheckoutButton({
   );
 
   const finishVerification = useCallback(
-    (result: "failed" | "verified") => {
-      setState((current) => (current === "verified" ? current : result));
+    (result: "failed" | "verified" | "suspended" | "revoked") => {
+      setState((current) => {
+        if (current === "revoked") return current;
+        if (current === "suspended" && result === "failed") return current;
+        return current === "verified" && result === "failed" ? current : result;
+      });
       setConfirmation(undefined);
       setMessage("");
       remember();
@@ -114,11 +122,20 @@ export function CheckoutButton({
           state: CheckoutState;
         };
         if (signal?.aborted) return;
-        if (savedState === "verified" || savedState === "failed")
+        if (
+          savedState === "verified" ||
+          savedState === "failed" ||
+          savedState === "suspended" ||
+          savedState === "revoked"
+        )
           finishVerification(savedState);
-        else if (savedState === "processing") {
+        else if (savedState === "processing" || savedState === "pending") {
           setState((current) =>
-            current === "verified" ? current : "processing",
+            current === "verified" ||
+            current === "suspended" ||
+            current === "revoked"
+              ? current
+              : savedState,
           );
           setMessage("");
         }
@@ -180,6 +197,8 @@ export function CheckoutButton({
       if (status === 401) setSignIn(true);
       else if (ok && data.success === true) await refreshStatus();
       else if (ok && data.state === "failed") finishVerification("failed");
+      else if (data.state === "suspended" || data.state === "revoked")
+        finishVerification(data.state);
       else if (status === 400 || status === 404) {
         remember();
         setConfirmation(undefined);
@@ -217,6 +236,8 @@ export function CheckoutButton({
         else if (status === 409) {
           if (data.state === "verified") await refreshStatus();
           else if (data.state === "processing") setState("processing");
+          else if (data.state === "suspended" || data.state === "revoked")
+            finishVerification(data.state);
           else router.refresh();
         } else setMessage(data.error ?? "Couldn’t start checkout. Try again.");
         release();
@@ -273,7 +294,7 @@ export function CheckoutButton({
   }
 
   const canOpen =
-    keyId && state !== "verified" && state !== "processing" && !signIn;
+    keyId && ["ready", "pending", "failed"].includes(state) && !signIn;
   return (
     <div className="grid gap-2">
       {canOpen && (

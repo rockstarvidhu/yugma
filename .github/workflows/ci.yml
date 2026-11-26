@@ -70,6 +70,39 @@ jobs:
           docker exec -i "$DB_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/auth_drafts.sql
           docker exec -i "$DB_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/private_draft_media.sql
           docker exec -i "$DB_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/test_invitation_publication.sql
+          docker exec -i "$DB_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/verified_test_fulfilment.sql
+          docker exec -i "$DB_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/test_publication_entitlement.sql
+          docker exec -i "$DB_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/test_payment_attempts.sql
+          bash supabase/tests/verified_test_fulfilment_concurrency.sh
+      - name: Exercise the Day 6 payment upgrade with legacy data
+        env:
+          DB_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker exec "$DB_CONTAINER" createdb -U postgres yugma_day6_upgrade
+          apply() {
+            docker exec -i "$DB_CONTAINER" psql -U postgres -d yugma_day6_upgrade -v ON_ERROR_STOP=1 "$@"
+          }
+          apply --single-transaction < supabase/fixtures/test-auth.sql
+          for migration in supabase/migrations/*.sql; do
+            if [[ "$migration" == supabase/migrations/20261124120000_* ]]; then
+              apply --single-transaction < supabase/fixtures/day6-upgrade.sql
+            fi
+            if [[ "$migration" == supabase/migrations/20261124120300_* ]]; then
+              apply --single-transaction < supabase/fixtures/day6-attempt-upgrade.sql
+            fi
+            apply --single-transaction < "$migration"
+          done
+          apply < supabase/tests/day6_upgrade.sql
+          apply < supabase/tests/day6_attempt_upgrade.sql
+          results=$(mktemp -d)
+          pids=()
+          for call in {1..6}; do
+            apply -XqAt -c "set role service_role; select public.record_razorpay_test_payment('order_Upgrade1','pay_Upgrade1',89900,'INR','captured',null,'evt_upgrade_1',repeat('a',64))" > "$results/$call" &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do wait "$pid"; done
+          test "$(grep -hlx verified "$results"/* | wc -l | tr -d ' ')" = 1
+          test "$(grep -hlx duplicate "$results"/* | wc -l | tr -d ' ')" = 5
       - name: Rehearse schema export and draft restore
         env:
           DB_CONTAINER: ${{ job.services.postgres.id }}

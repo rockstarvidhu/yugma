@@ -17,10 +17,15 @@ const mocks = vi.hoisted(() => ({
   findTestOrder: vi.fn(),
   reserveTestOrder: vi.fn(),
   attachGatewayTestOrder: vi.fn(),
+  authorizeTestCheckout: vi.fn(),
+  reconcileTestAttempts: vi.fn(),
   recordTestPayment: vi.fn(),
   createGatewayOrder: vi.fn(),
   listGatewayOrders: vi.fn(),
   fetchGatewayPayment: vi.fn(),
+  fetchOrderPayments: vi.fn(),
+  claimTestReconciliation: vi.fn(),
+  recordedWebhook: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -36,7 +41,11 @@ vi.mock("./store", async (importOriginal) => ({
   findTestOrder: mocks.findTestOrder,
   reserveTestOrder: mocks.reserveTestOrder,
   attachGatewayTestOrder: mocks.attachGatewayTestOrder,
+  authorizeTestCheckout: mocks.authorizeTestCheckout,
+  reconcileTestAttempts: mocks.reconcileTestAttempts,
   recordTestPayment: mocks.recordTestPayment,
+  claimTestReconciliation: mocks.claimTestReconciliation,
+  recordedWebhook: mocks.recordedWebhook,
 }));
 vi.mock("./gateway", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./gateway")>()),
@@ -58,6 +67,7 @@ const order = {
   amount_paise: cataloguePrice,
   currency: "INR",
   status: "test_created",
+  test_entitlement: null,
 };
 const reservation = {
   id: order.id,
@@ -73,6 +83,12 @@ const payment = {
   amount: order.amount_paise,
   currency: order.currency,
   status: "captured",
+};
+const gatewayPayment = {
+  ...payment,
+  captured: true,
+  amount_refunded: 0,
+  refund_status: null,
 };
 const confirmation = {
   razorpay_order_id: order.gateway_order_id,
@@ -95,14 +111,13 @@ beforeEach(() => {
   mocks.getVerifiedSession.mockResolvedValue({ client: {}, ownerId });
   mocks.createServiceClient.mockReturnValue(db);
   mocks.getTestGateway.mockReturnValue({
-    sdk: {
-      orders: {
-        create: mocks.createGatewayOrder,
-        all: mocks.listGatewayOrders,
-      },
-      payments: { fetch: mocks.fetchGatewayPayment },
+    orders: {
+      create: mocks.createGatewayOrder,
+      all: mocks.listGatewayOrders,
     },
     keySecret: secret,
+    fetchPayment: mocks.fetchGatewayPayment,
+    fetchOrderPayments: mocks.fetchOrderPayments,
   });
   mocks.loadAfterglowCheckoutDraft.mockResolvedValue({
     id: draftId,
@@ -113,13 +128,21 @@ beforeEach(() => {
   mocks.findTestOrder.mockResolvedValue(order);
   mocks.reserveTestOrder.mockResolvedValue(reservation);
   mocks.attachGatewayTestOrder.mockResolvedValue(order);
+  mocks.authorizeTestCheckout.mockResolvedValue(true);
+  mocks.reconcileTestAttempts.mockResolvedValue({
+    state: "pending",
+    paymentId: null,
+  });
   mocks.createGatewayOrder.mockResolvedValue({
     id: order.gateway_order_id,
     amount: cataloguePrice,
     currency: "INR",
     receipt,
   });
-  mocks.fetchGatewayPayment.mockResolvedValue(payment);
+  mocks.fetchGatewayPayment.mockResolvedValue(gatewayPayment);
+  mocks.fetchOrderPayments.mockResolvedValue({ items: [] });
+  mocks.claimTestReconciliation.mockResolvedValue(false);
+  mocks.recordedWebhook.mockResolvedValue(false);
   mocks.listGatewayOrders.mockResolvedValue({ items: [] });
   mocks.recordTestPayment.mockResolvedValue("verified");
 });
@@ -203,9 +226,64 @@ describe("Razorpay Test Mode routes", () => {
     mocks.findTestOrder.mockResolvedValue({
       ...order,
       status: "test_verified",
+      test_entitlement: "active",
     });
     expect((await createOrder(request({ draftId }))).status).toBe(409);
     expect(mocks.createGatewayOrder).not.toHaveBeenCalled();
+  });
+
+  it("holds a direct retry when the failed payment has been authorized since the last status check", async () => {
+    mocks.findTestOrder.mockResolvedValue({
+      ...order,
+      status: "test_failed",
+      gateway_payment_id: payment.id,
+    });
+    const authorized = {
+      ...gatewayPayment,
+      status: "authorized",
+      captured: false,
+    };
+    mocks.fetchOrderPayments.mockResolvedValue({ items: [authorized] });
+    mocks.reconcileTestAttempts.mockResolvedValue({
+      state: "processing",
+      paymentId: payment.id,
+    });
+    const response = await createOrder(request({ draftId }));
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ state: "processing" });
+    expect(mocks.reconcileTestAttempts).toHaveBeenCalledWith(
+      db,
+      expect.objectContaining({ id: order.id }),
+      ownerId,
+      [{ ...payment, status: "authorized" }],
+      expect.any(String),
+    );
+    expect(mocks.authorizeTestCheckout).not.toHaveBeenCalled();
+    expect(mocks.createGatewayOrder).not.toHaveBeenCalled();
+  });
+
+  it("denies a retry if the locked order no longer matches the definitive provider failure", async () => {
+    mocks.findTestOrder.mockResolvedValue({
+      ...order,
+      status: "test_failed",
+      gateway_payment_id: payment.id,
+    });
+    mocks.fetchOrderPayments.mockResolvedValue({
+      items: [{ ...gatewayPayment, status: "failed", captured: false }],
+    });
+    mocks.authorizeTestCheckout.mockResolvedValue(false);
+    mocks.reconcileTestAttempts.mockResolvedValue({
+      state: "failed",
+      paymentId: payment.id,
+    });
+    const response = await createOrder(request({ draftId }));
+    expect(response.status).toBe(409);
+    expect(mocks.authorizeTestCheckout).toHaveBeenCalledWith(
+      db,
+      ownerId,
+      order.id,
+      payment.id,
+    );
   });
 
   it("rejects unauthorized requests, a client-supplied amount and an inaccessible draft", async () => {
@@ -260,7 +338,10 @@ describe("Razorpay Test Mode routes", () => {
     [{ order_id: "order_Other" }, 400],
     [{ id: "pay_Other" }, 400],
   ])("rejects a payment with %j", async (override, expected) => {
-    mocks.fetchGatewayPayment.mockResolvedValue({ ...payment, ...override });
+    mocks.fetchGatewayPayment.mockResolvedValue({
+      ...gatewayPayment,
+      ...override,
+    });
     expect((await verifyPayment(request(confirmation))).status).toBe(expected);
     expect(mocks.recordTestPayment).not.toHaveBeenCalled();
   });
@@ -271,7 +352,8 @@ describe("Razorpay Test Mode routes", () => {
       ["failed", "failed", 200],
     ] as const) {
       mocks.fetchGatewayPayment.mockResolvedValue({
-        ...payment,
+        ...gatewayPayment,
+        captured: false,
         status: providerStatus,
       });
       mocks.recordTestPayment.mockResolvedValue(state);
@@ -281,7 +363,7 @@ describe("Razorpay Test Mode routes", () => {
     }
   });
 
-  it("records the matching capture and accepts a signed replay without writing twice", async () => {
+  it("rechecks a signed replay against the provider with the same atomic receipt", async () => {
     const first = await verifyPayment(request(confirmation));
     expect(await first.json()).toEqual({ success: true });
     expect(mocks.recordTestPayment).toHaveBeenCalledWith(db, payment, {
@@ -291,11 +373,175 @@ describe("Razorpay Test Mode routes", () => {
       ...order,
       status: "test_verified",
       gateway_payment_id: payment.id,
+      test_entitlement: "active",
     });
     const again = await verifyPayment(request(confirmation));
     expect(await again.json()).toEqual({ success: true });
-    expect(mocks.recordTestPayment).toHaveBeenCalledTimes(1);
-    expect(mocks.fetchGatewayPayment).toHaveBeenCalledTimes(1);
+    expect(mocks.recordTestPayment).toHaveBeenCalledTimes(2);
+    expect(mocks.fetchGatewayPayment).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([{ status: "captured", captured: false }])(
+    "does not fulfil ambiguous capture evidence %j",
+    async (change) => {
+      mocks.fetchGatewayPayment.mockResolvedValue({
+        ...gatewayPayment,
+        ...change,
+      });
+      expect((await verifyPayment(request(confirmation))).status).toBe(409);
+      expect(mocks.recordTestPayment).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    [{ status: "refunded", amount_refunded: cataloguePrice }, "revoked"],
+    [{ refund_status: "partial", amount_refunded: 100 }, "suspended"],
+    [{ refund_status: "full", amount_refunded: 0 }, "suspended"],
+  ] as const)(
+    "reconciles refund evidence for an already verified receipt %j",
+    async (change, outcome) => {
+      mocks.findTestOrder.mockResolvedValue({
+        ...order,
+        status: "test_verified",
+        gateway_payment_id: payment.id,
+        test_entitlement: "active",
+      });
+      mocks.claimTestReconciliation.mockResolvedValue(true);
+      mocks.fetchGatewayPayment.mockResolvedValue({
+        ...gatewayPayment,
+        ...change,
+      });
+      mocks.recordTestPayment.mockResolvedValue(outcome);
+      mocks.reconcileTestAttempts.mockResolvedValue({
+        state: outcome,
+        paymentId: payment.id,
+      });
+      expect(await (await getCheckoutStatus(draftId)).json()).toEqual({
+        state: outcome,
+      });
+      expect(mocks.reconcileTestAttempts).toHaveBeenCalledWith(
+        db,
+        expect.objectContaining({ gateway_payment_id: payment.id }),
+        ownerId,
+        [{ ...payment, status: outcome }],
+        expect.any(String),
+      );
+      const callback = await verifyPayment(request(confirmation));
+      expect(callback.status).toBe(409);
+      expect(await callback.json()).toEqual({ state: outcome });
+      expect(mocks.recordTestPayment).toHaveBeenCalledWith(
+        db,
+        { ...payment, status: outcome },
+        { ownerId },
+      );
+    },
+  );
+
+  it("records a definitive provider cancellation without granting entitlement", async () => {
+    mocks.fetchGatewayPayment.mockResolvedValue({
+      ...gatewayPayment,
+      status: "cancelled",
+      captured: false,
+    });
+    mocks.recordTestPayment.mockResolvedValue("failed");
+    expect(await (await verifyPayment(request(confirmation))).json()).toEqual({
+      state: "failed",
+    });
+    expect(mocks.recordTestPayment).toHaveBeenCalledWith(
+      db,
+      { ...payment, status: "failed" },
+      { ownerId },
+      expect.any(String),
+    );
+  });
+
+  it("recovers a matching capture on return without a browser receipt or webhook", async () => {
+    mocks.claimTestReconciliation.mockResolvedValue(true);
+    mocks.reconcileTestAttempts.mockResolvedValue({
+      state: "verified",
+      paymentId: payment.id,
+    });
+    mocks.fetchOrderPayments.mockResolvedValue({
+      items: [
+        {
+          ...gatewayPayment,
+          id: "pay_Previous",
+          status: "failed",
+          captured: false,
+        },
+        { ...gatewayPayment, id: "pay_Other", amount: 100 },
+        gatewayPayment,
+      ],
+    });
+    expect(await (await getCheckoutStatus(draftId)).json()).toEqual({
+      state: "verified",
+    });
+    expect(mocks.fetchOrderPayments).toHaveBeenCalledExactlyOnceWith(
+      order.gateway_order_id,
+    );
+    expect(mocks.claimTestReconciliation).toHaveBeenCalledExactlyOnceWith(
+      db,
+      ownerId,
+      order.id,
+    );
+    expect(mocks.reconcileTestAttempts).toHaveBeenCalledExactlyOnceWith(
+      db,
+      order,
+      ownerId,
+      [{ ...payment, id: "pay_Previous", status: "failed" }, payment],
+      expect.any(String),
+    );
+  });
+
+  it("preserves pending after a provider timeout and skips reads while throttled", async () => {
+    mocks.claimTestReconciliation.mockResolvedValueOnce(true);
+    mocks.fetchOrderPayments.mockRejectedValueOnce(new Error("timed out"));
+    expect(await (await getCheckoutStatus(draftId)).json()).toEqual({
+      state: "pending",
+    });
+    expect(await (await getCheckoutStatus(draftId)).json()).toEqual({
+      state: "pending",
+    });
+    expect(mocks.fetchOrderPayments).toHaveBeenCalledTimes(1);
+    expect(mocks.recordTestPayment).not.toHaveBeenCalled();
+  });
+
+  it("reconciles a verified funding payment and separate refund in the same snapshot", async () => {
+    const funded = {
+      ...order,
+      status: "test_verified",
+      gateway_payment_id: payment.id,
+      test_entitlement: "active",
+    };
+    mocks.findTestOrder.mockResolvedValue(funded);
+    mocks.claimTestReconciliation.mockResolvedValue(true);
+    mocks.fetchOrderPayments.mockResolvedValue({
+      items: [
+        {
+          ...gatewayPayment,
+          id: "pay_Previous",
+          status: "refunded",
+          captured: false,
+          amount_refunded: cataloguePrice,
+          refund_status: "full",
+        },
+        gatewayPayment,
+      ],
+    });
+    mocks.reconcileTestAttempts.mockResolvedValue({
+      state: "verified",
+      paymentId: payment.id,
+    });
+    expect(await (await getCheckoutStatus(draftId)).json()).toEqual({
+      state: "verified",
+    });
+    expect(mocks.reconcileTestAttempts).toHaveBeenCalledExactlyOnceWith(
+      db,
+      funded,
+      ownerId,
+      [{ ...payment, id: "pay_Previous", status: "revoked" }, payment],
+      expect.any(String),
+    );
   });
 
   it("requires matching Test Mode key IDs and a server-side secret", () => {
@@ -321,6 +567,7 @@ describe("Razorpay Test Mode routes", () => {
     mocks.findTestOrder.mockResolvedValue({
       ...order,
       status: "test_verified",
+      test_entitlement: "active",
     });
     const status = await getCheckoutStatus(draftId);
     expect(status.headers.get("cache-control")).toBe("private, no-store");
@@ -365,6 +612,7 @@ describe("Razorpay payment webhooks", () => {
     expect((await razorpayWebhook(webhook(raw))).status).toBe(204);
     expect(mocks.recordTestPayment).toHaveBeenCalledWith(db, payment, {
       eventId: "evt_Fixture",
+      digest: expect.stringMatching(/^[a-f0-9]{64}$/),
     });
     expect(mocks.getVerifiedSession).not.toHaveBeenCalled();
     mocks.recordTestPayment.mockResolvedValueOnce("duplicate");
@@ -373,5 +621,156 @@ describe("Razorpay payment webhooks", () => {
       new Error("database unavailable"),
     );
     expect((await razorpayWebhook(webhook(raw))).status).toBe(503);
+  });
+  it("denies missing and malformed signatures before any provider or database work", async () => {
+    expect((await razorpayWebhook(webhook(raw, ""))).status).toBe(401);
+    expect((await razorpayWebhook(webhook(raw, "nonsense"))).status).toBe(401);
+    expect(mocks.createServiceClient).not.toHaveBeenCalled();
+    expect(mocks.fetchGatewayPayment).not.toHaveBeenCalled();
+  });
+
+  it("acknowledges replay only after finding a committed outcome", async () => {
+    mocks.recordedWebhook.mockResolvedValueOnce(true);
+    expect((await razorpayWebhook(webhook(raw))).status).toBe(204);
+    expect(mocks.fetchGatewayPayment).not.toHaveBeenCalled();
+    expect(mocks.recordTestPayment).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { id: "pay_Wrong" },
+    { amount: 1 },
+    { currency: "USD" },
+    { order_id: "order_Wrong" },
+  ])(
+    "records a durable ignored outcome for mismatched provider evidence %j",
+    async (change) => {
+      mocks.fetchGatewayPayment.mockResolvedValue({
+        ...gatewayPayment,
+        ...change,
+      });
+      expect((await razorpayWebhook(webhook(raw))).status).toBe(204);
+      expect(mocks.recordTestPayment).toHaveBeenCalledExactlyOnceWith(
+        db,
+        { ...payment, status: "ignored" },
+        expect.objectContaining({ eventId: "evt_Fixture" }),
+      );
+    },
+  );
+
+  it("retries after provider timeout, delayed capture, or incomplete order attachment", async () => {
+    mocks.findTestOrder.mockResolvedValueOnce(null);
+    expect((await razorpayWebhook(webhook(raw))).status).toBe(503);
+    mocks.fetchGatewayPayment.mockRejectedValueOnce(
+      new Error("provider timeout"),
+    );
+    expect((await razorpayWebhook(webhook(raw))).status).toBe(503);
+    mocks.fetchGatewayPayment.mockResolvedValueOnce({
+      ...gatewayPayment,
+      captured: false,
+      status: "authorized",
+    });
+    expect((await razorpayWebhook(webhook(raw))).status).toBe(503);
+    expect(mocks.recordTestPayment).not.toHaveBeenCalled();
+    expect((await razorpayWebhook(webhook(raw))).status).toBe(204);
+    expect(mocks.recordTestPayment).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses current capture evidence even if a signed failed event is delivered late", async () => {
+    const delayed = JSON.stringify({
+      event: "payment.failed",
+      payload: { payment: { entity: { ...payment, status: "failed" } } },
+    });
+    expect((await razorpayWebhook(webhook(delayed))).status).toBe(204);
+    expect(mocks.recordTestPayment).toHaveBeenCalledWith(
+      db,
+      payment,
+      expect.objectContaining({ eventId: "evt_Fixture" }),
+    );
+  });
+
+  function refund(event = "refund.processed", sourcePayment = payment.id) {
+    return JSON.stringify({
+      event,
+      payload: {
+        payment: { entity: payment },
+        refund: {
+          entity: {
+            id: "rfnd_Fixture",
+            payment_id: sourcePayment,
+            status: "processed",
+          },
+        },
+      },
+    });
+  }
+
+  it("holds a signed refund while provider evidence is unavailable, then revokes on retry", async () => {
+    mocks.recordTestPayment.mockResolvedValueOnce("awaiting_verification");
+    mocks.fetchGatewayPayment.mockRejectedValueOnce(
+      new Error("Provider unavailable"),
+    );
+    expect((await razorpayWebhook(webhook(refund()))).status).toBe(503);
+    expect(mocks.recordTestPayment).toHaveBeenCalledWith(
+      db,
+      { ...payment, status: "pending_review" },
+      expect.objectContaining({ eventId: "evt_Fixture" }),
+    );
+    mocks.recordTestPayment
+      .mockResolvedValueOnce("awaiting_verification")
+      .mockResolvedValueOnce("revoked");
+    mocks.fetchGatewayPayment.mockResolvedValue({
+      ...gatewayPayment,
+      amount_refunded: cataloguePrice,
+      refund_status: "full",
+    });
+    expect((await razorpayWebhook(webhook(refund()))).status).toBe(204);
+    expect(mocks.recordTestPayment.mock.lastCall?.[1]).toEqual({
+      ...payment,
+      status: "revoked",
+    });
+    mocks.recordedWebhook.mockResolvedValueOnce(true);
+    expect((await razorpayWebhook(webhook(refund()))).status).toBe(204);
+    expect(mocks.fetchGatewayPayment).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects an unsigned notification and a mismatched refund payment before applying a hold", async () => {
+    expect((await razorpayWebhook(webhook(refund(), "invalid"))).status).toBe(
+      401,
+    );
+    expect(
+      (await razorpayWebhook(webhook(refund("refund.processed", "pay_Other"))))
+        .status,
+    ).toBe(400);
+    expect(mocks.recordTestPayment).not.toHaveBeenCalled();
+    expect(mocks.fetchGatewayPayment).not.toHaveBeenCalled();
+  });
+
+  it("does not acknowledge a recoverable atomic event failure", async () => {
+    mocks.recordTestPayment
+      .mockResolvedValueOnce("retry")
+      .mockResolvedValueOnce("verified");
+    expect((await razorpayWebhook(webhook(raw))).status).toBe(503);
+    expect((await razorpayWebhook(webhook(raw))).status).toBe(204);
+    expect(mocks.fetchGatewayPayment).toHaveBeenCalledTimes(2);
+  });
+
+  it("revalidates a processed legacy event without an order outcome", async () => {
+    const { recordedWebhook } =
+      await vi.importActual<typeof import("./store")>("./store");
+    const select = vi.fn();
+    const filter = { select, or: vi.fn(), not: vi.fn(), limit: vi.fn() };
+    filter.select.mockReturnValue(filter);
+    filter.or.mockReturnValue(filter);
+    filter.not.mockReturnValue(filter);
+    filter.limit.mockResolvedValue({
+      data: [{ outcome: "legacy_unbound" }],
+      error: null,
+    });
+    mocks.createServiceClient.mockReturnValue({ from: () => filter });
+    mocks.recordedWebhook.mockImplementation(recordedWebhook);
+    expect((await razorpayWebhook(webhook(raw))).status).toBe(204);
+    expect(select).toHaveBeenCalledWith("outcome");
+    expect(mocks.fetchGatewayPayment).toHaveBeenCalledWith(payment.id);
+    expect(mocks.recordTestPayment).toHaveBeenCalledTimes(1);
   });
 });

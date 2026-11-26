@@ -35,17 +35,21 @@ export async function POST(
       return failure(400, "Review and confirm the title and link.");
 
     const existing = await loadOwnerPublication(session, id);
-    if (existing) return respond({ slug: existing.share_slug });
-    const draft = await loadDraft(session, id);
-    if (!draft || draft.templateKey !== "afterglow")
-      return failure(404, "Invitation unavailable.");
-    if (draft.version !== input.data.expectedVersion)
-      return failure(
-        409,
-        "Your draft changed. Reload this page to review it again.",
-      );
-    if (!invitationSchema.safeParse(draft.data).success)
-      return failure(422, "Complete all invitation details before publishing.");
+    if (!existing) {
+      const draft = await loadDraft(session, id);
+      if (!draft || draft.templateKey !== "afterglow")
+        return failure(404, "Invitation unavailable.");
+      if (draft.version !== input.data.expectedVersion)
+        return failure(
+          409,
+          "Your draft changed. Reload this page to review it again.",
+        );
+      if (!invitationSchema.safeParse(draft.data).success)
+        return failure(
+          422,
+          "Complete all invitation details before publishing.",
+        );
+    }
 
     const outcome = await publishTestInvitation(
       session.ownerId,
@@ -54,7 +58,7 @@ export async function POST(
     );
     switch (outcome) {
       case "unpaid":
-        return failure(403, "Verify your test payment before publishing.");
+        return failure(403, "An active test payment is required to publish.");
       case "stale":
         return failure(
           409,
@@ -64,6 +68,11 @@ export async function POST(
         return failure(409, "This link is already in use. Choose another.");
       case "missing":
         return failure(404, "Invitation unavailable.");
+      case "invalid_media":
+        return failure(
+          422,
+          "Choose a cover photo uploaded to this invitation or remove it before publishing.",
+        );
       case "invalid":
         return failure(400, "Review and confirm the title and link.");
       case "published": {

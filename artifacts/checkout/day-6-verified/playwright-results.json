@@ -1,0 +1,16 @@
+{
+  "environment": "Loopback production build, PostgreSQL via PGlite, fixture Supabase Auth and R2, signed webhook and authoritative provider HTTP fixtures",
+  "routes": {
+    "checkout": "/checkout/[id]",
+    "publish": "/publish/[id]",
+    "public": "/i/tara-neel-day-06"
+  },
+  "checks": [
+    "The sample led to account registration, a new draft, saved ceremony details and a verified cover upload.",
+    "Unpaid, signed-out and cross-account publish requests were rejected. Unpublished page and cover returned 404.",
+    "A server-priced order, invalid callback, authorization-only denial, delayed capture, owner return without sessionStorage, retryable outage and concurrent webhook replays passed.",
+    "The verified owner edited before publishing. An older review was rejected. Desktop copied the public URL.",
+    "Mobile copy and Web Share received the correct URL. A fresh anonymous context rendered the cover, metadata and invitation without a watermark.",
+    "The editor and Studio returned to sharing. Duplicate publish returned the original slug. Revocation and deletion removed the page and photo."
+  ]
+}
