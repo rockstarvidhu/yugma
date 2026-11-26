@@ -64,11 +64,33 @@ wait "$refund_pid"
 test "$(sql -c "set role service_role; select count(*) from public.get_test_publication('$slug')")" = 0
 test "$(sql -c "select share_slug from public.invitations where id='$draft'")" = "$slug"
 
+attempt_draft=d2000000-0000-4000-8000-000000000002
 sql <<SQL
-delete from public.payment_events where gateway_event_id='$event';
-delete from public.orders where gateway_order_id='$order';
-delete from public.invitations where id='$draft';
+insert into public.invitations (id,owner_id,template_id,data)
+  select '$attempt_draft','$owner',id,'{}' from public.templates where registry_key='afterglow';
+insert into public.orders (invitation_id,owner_id,template_id,amount_paise,gateway_order_id,status)
+  select id,owner_id,template_id,89900,'order_RaceAttempts','test_created' from public.invitations where id='$attempt_draft';
+SQL
+
+sql -c "set role service_role;
+  select public.record_razorpay_test_payment('order_RaceAttempts','pay_RacePrior',89900,'INR','pending_review',null,'evt_attempt_race_refund',repeat('d',64));
+  select public.record_razorpay_test_payment('order_RaceAttempts','pay_RacePrior',89900,'INR','revoked',null,'evt_attempt_race_refund',repeat('d',64))" > "$tmp_dir/attempt-refund" &
+attempt_refund_pid=$!
+sql -c "set role service_role;
+  select public.record_razorpay_test_payment('order_RaceAttempts','pay_RaceFunding',89900,'INR','captured','$owner',null)" > "$tmp_dir/attempt-funding" &
+attempt_funding_pid=$!
+wait "$attempt_refund_pid"
+wait "$attempt_funding_pid"
+grep -Fxq revoked "$tmp_dir/attempt-refund"
+grep -Fxq verified "$tmp_dir/attempt-funding"
+test "$(sql -c "select count(*) from public.orders where invitation_id='$attempt_draft' and test_entitlement='active' and gateway_payment_id='pay_RaceFunding'")" = 1
+test "$(sql -c "select count(*) from yugma_private.razorpay_test_attempts where gateway_payment_id='pay_RacePrior' and financial_hold='revoked'")" = 1
+
+sql <<SQL
+delete from public.payment_events where gateway_event_id in ('$event','evt_attempt_race_refund');
+delete from public.orders where gateway_order_id in ('$order','order_RaceAttempts');
+delete from public.invitations where id in ('$draft','$attempt_draft');
 delete from auth.users where id='$owner';
 SQL
 find "$tmp_dir" -type f -delete
-echo "Twelve fulfilment calls, eight publication calls and concurrent refund access checks passed"
+echo "Twelve fulfilment calls, eight publication calls and concurrent same- and cross-attempt refund checks passed"

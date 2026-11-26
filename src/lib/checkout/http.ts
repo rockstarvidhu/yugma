@@ -14,6 +14,7 @@ import {
   claimTestReconciliation,
   findTestOrder,
   loadAfterglowCheckoutDraft,
+  reconcileTestAttempts,
   recordTestPayment,
   recordedWebhook,
   reserveTestOrder,
@@ -61,7 +62,12 @@ const providerPayment = eventPayment.extend({
   amount_refunded: z.number().int().nonnegative(),
   refund_status: z.enum(["partial", "full"]).nullish(),
 });
-const orderPayments = z.object({ items: z.array(z.unknown()).max(100) });
+const orderPayments = z
+  .object({
+    items: z.array(z.unknown()).max(100),
+    count: z.number().int().nonnegative().optional(),
+  })
+  .refine(({ items, count }) => count === undefined || count === items.length);
 type ProviderPayment = z.output<typeof providerPayment>;
 
 function matchedPayment(input: unknown, order: TestOrder, expectedId?: string) {
@@ -191,20 +197,11 @@ async function getOrderEvidence(order: TestOrder) {
   });
 }
 
-function bestEvidence(
+function matchedEvidence(
   evidence: Awaited<ReturnType<typeof getOrderEvidence>>,
-  order: TestOrder,
 ) {
-  return (
-    evidence.find((item) => item?.status === "revoked") ??
-    evidence.find((item) => item?.status === "suspended") ??
-    evidence.find((item) => item?.status === "captured") ??
-    evidence.find((item) => item?.status === "authorized") ??
-    evidence.find(
-      (item) =>
-        item?.id === order.gateway_payment_id && item.status === "failed",
-    ) ??
-    evidence.find((item) => item?.status === "failed")
+  return evidence.flatMap((item) =>
+    item && item.status !== "ignored" ? [item] : [],
   );
 }
 
@@ -218,33 +215,18 @@ async function checkRetry(
 
   const checkedAt = new Date().toISOString();
   const evidence = await getOrderEvidence(order);
-  const candidate = bestEvidence(evidence, order);
-  if (candidate && candidate.status !== "failed") {
-    const state =
-      candidate.status === "authorized"
-        ? await recordTestPayment(db, candidate, { ownerId }, checkedAt)
-        : await recordTestPayment(db, candidate, { ownerId });
-    return isCheckoutState(state) ? state : "processing";
-  }
-  if (evidence.some((item) => item?.status !== "failed")) return "processing";
-  if (
-    current === "failed" &&
-    !evidence.some((item) => item?.id === order.gateway_payment_id)
-  )
-    return "processing";
-  if (
-    current === "pending" &&
-    candidate &&
-    (await recordTestPayment(db, candidate, { ownerId }, checkedAt)) !==
-      "failed"
-  )
-    return "processing";
-  return (await authorizeTestCheckout(
+  const { state, paymentId } = await reconcileTestAttempts(
     db,
+    order,
     ownerId,
-    order.id,
-    candidate?.id ?? null,
-  ))
+    matchedEvidence(evidence),
+    checkedAt,
+  );
+  if (state !== "pending" && state !== "failed") return state;
+  if (evidence.some((item) => item?.status !== "failed")) return "processing";
+  if (state === "failed" && !evidence.some((item) => item?.id === paymentId))
+    return "processing";
+  return (await authorizeTestCheckout(db, ownerId, order.id, paymentId))
     ? "pending"
     : "processing";
 }
@@ -343,12 +325,6 @@ export function verifyPayment(request: Request) {
     )
       return failure(400, "Payment signature verification failed.");
 
-    if (
-      order.status === "test_verified" &&
-      order.gateway_payment_id !== paymentId
-    )
-      return failure(400, "This order has a different verified payment.");
-
     const checkedAt = new Date().toISOString();
     const payment = matchedPayment(
       await fetchPayment(paymentId),
@@ -364,6 +340,18 @@ export function verifyPayment(request: Request) {
       evidence.status === "authorized" || evidence.status === "failed"
         ? await recordTestPayment(db, evidence, { ownerId }, checkedAt)
         : await recordTestPayment(db, evidence, { ownerId });
+    if (
+      order.status === "test_verified" &&
+      order.gateway_payment_id !== paymentId
+    ) {
+      const latest = await findTestOrder(db, ownerId, {
+        gatewayOrderId: order.gateway_order_id,
+      });
+      return respond(
+        { state: latest ? checkoutState(latest) : "processing" },
+        409,
+      );
+    }
     if (state === "verified") return respond({ success: true });
     if (state === "failed") return respond({ state });
     if (isCheckoutState(state)) return respond({ state }, 409);
@@ -382,37 +370,50 @@ export async function getCheckoutStatus(draftId: string) {
     if (!order && !(await loadAfterglowCheckoutDraft(session, draftId)))
       return failure(404, "Draft unavailable for checkout.");
     const current = checkoutState(order);
-    if (!order || current === "revoked") return respond({ state: current });
+    if (!order) return respond({ state: current });
 
     if (!(await claimTestReconciliation(db, session.ownerId, order.id)))
       return respond({ state: current });
 
     try {
-      if (order.status === "test_verified" && order.gateway_payment_id) {
-        const payment = matchedPayment(
-          await getTestGateway().fetchPayment(order.gateway_payment_id),
-          order,
-          order.gateway_payment_id,
-        );
-        if (payment) {
-          const state = await recordTestPayment(db, paymentEvidence(payment), {
-            ownerId: session.ownerId,
-          });
-          if (isCheckoutState(state)) return respond({ state });
-        }
-        return respond({ state: current });
-      }
       const checkedAt = new Date().toISOString();
-      const evidence = await getOrderEvidence(order);
-      const candidate = bestEvidence(evidence, order);
-      if (candidate) {
-        const source = { ownerId: session.ownerId };
-        const state =
-          candidate.status === "authorized" || candidate.status === "failed"
-            ? await recordTestPayment(db, candidate, source, checkedAt)
-            : await recordTestPayment(db, candidate, source);
-        if (isCheckoutState(state)) return respond({ state });
+      const fundingId =
+        order.status === "test_verified" ? order.gateway_payment_id : null;
+      const [attempts, funding] = await Promise.all([
+        getOrderEvidence(order).catch(() => []),
+        fundingId
+          ? getTestGateway()
+              .fetchPayment(fundingId)
+              .catch(() => null)
+          : null,
+      ]);
+      const evidence = matchedEvidence(attempts);
+      const fundingPayment = fundingId
+        ? matchedPayment(funding, order, fundingId)
+        : null;
+      if (fundingPayment) {
+        const direct = paymentEvidence(fundingPayment);
+        const listed = evidence.find(({ id }) => id === fundingId);
+        // Preserve any refund signal across two authoritative reads that can
+        // straddle a provider update.
+        const preferred =
+          [direct, listed].find((item) => item?.status === "revoked") ??
+          [direct, listed].find((item) => item?.status === "suspended") ??
+          (direct.status === "ignored" ? listed : direct);
+        if (preferred) {
+          const index = evidence.findIndex(({ id }) => id === fundingId);
+          if (index === -1) evidence.push(preferred);
+          else evidence[index] = preferred;
+        }
       }
+      const { state } = await reconcileTestAttempts(
+        db,
+        order,
+        session.ownerId,
+        evidence,
+        checkedAt,
+      );
+      return respond({ state });
     } catch {
       // A provider timeout must never unlock anything or erase the saved order state.
     }
@@ -541,8 +542,7 @@ async function handleFinancialWebhook(
     return failure(503, "Checkout order matching is pending. Retry delivery.");
   if (
     entity.amount !== order.amount_paise ||
-    entity.currency !== order.currency ||
-    (order.status === "test_verified" && order.gateway_payment_id !== entity.id)
+    entity.currency !== order.currency
   )
     return failure(400, "Webhook does not match the checkout payment.");
 
@@ -554,7 +554,8 @@ async function handleFinancialWebhook(
     { ...entity, status: "pending_review" },
     source,
   );
-  if (held === "duplicate") return new Response(null, { status: 204 });
+  if (held === "duplicate" || held === "ignored")
+    return new Response(null, { status: 204 });
   if (held !== "awaiting_verification")
     return failure(503, "Checkout order matching is pending. Retry delivery.");
   const payment = matchedPayment(

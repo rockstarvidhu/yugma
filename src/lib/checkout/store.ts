@@ -91,6 +91,52 @@ export function checkoutState(
 
 export type TestOrder = z.output<typeof testOrderSchema>;
 
+export type TestPaymentEvidence = {
+  id: string;
+  order_id: string | null;
+  amount: number;
+  currency: string;
+  status:
+    | "authorized"
+    | "captured"
+    | "failed"
+    | "ignored"
+    | "suspended"
+    | "revoked"
+    | "pending_review";
+};
+
+const reconciledOrder = z.object({
+  paymentId: z.string().nullable(),
+  state: z.enum([
+    "pending",
+    "failed",
+    "processing",
+    "verified",
+    "suspended",
+    "revoked",
+  ]),
+});
+
+export async function reconcileTestAttempts(
+  db: ServiceClient,
+  order: TestOrder,
+  ownerId: string,
+  attempts: TestPaymentEvidence[],
+  checkedAt: string,
+) {
+  if (!attempts.length)
+    return { state: checkoutState(order), paymentId: order.gateway_payment_id };
+  const { data, error } = await db.rpc("reconcile_razorpay_test_attempts", {
+    p_owner_id: ownerId,
+    p_order_id: order.gateway_order_id,
+    p_attempts: attempts,
+    p_checked_at: checkedAt,
+  });
+  if (error) throw error;
+  return reconciledOrder.parse(data);
+}
+
 export async function findTestOrder(
   db: ServiceClient,
   ownerId: string | null,
@@ -206,20 +252,7 @@ export async function attachGatewayTestOrder(
 
 export async function recordTestPayment(
   db: ServiceClient,
-  payment: {
-    id: string;
-    order_id: string | null;
-    amount: number;
-    currency: string;
-    status:
-      | "authorized"
-      | "captured"
-      | "failed"
-      | "ignored"
-      | "suspended"
-      | "revoked"
-      | "pending_review";
-  },
+  payment: TestPaymentEvidence,
   source: { ownerId: string } | { eventId: string; digest: string },
   checkedAt?: string,
 ) {

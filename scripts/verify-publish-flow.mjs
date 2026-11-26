@@ -67,6 +67,12 @@ const rpc = {
     "p_id",
     "p_expected_payment_id",
   ],
+  reconcile_razorpay_test_attempts: [
+    "p_owner_id",
+    "p_order_id",
+    "p_attempts",
+    "p_checked_at",
+  ],
   record_razorpay_test_payment: [
     "p_order_id",
     "p_payment_id",
@@ -94,6 +100,7 @@ const scalarRpc = new Set([
   "record_razorpay_test_payment",
   "claim_razorpay_test_reconciliation",
   "authorize_razorpay_test_checkout",
+  "reconcile_razorpay_test_attempts",
   "publish_test_invitation",
 ]);
 
@@ -316,7 +323,11 @@ const transport = createServer(async (req, res) => {
       (service || name === "get_published_invitation")
     ) {
       const input = JSON.parse(await bytes(req));
-      const args = rpc[name].map((key) => input[key] ?? null);
+      const args = rpc[name].map((key) =>
+        key === "p_attempts"
+          ? JSON.stringify(input[key])
+          : (input[key] ?? null),
+      );
       const call = `public.${name}(${args.map((_, index) => "$" + (index + 1)).join(",")})`;
       const scalar = scalarRpc.has(name);
       const rows = await query(
@@ -367,6 +378,155 @@ function sendWebhook(payload, signatureValid = true, eventId = randomUUID()) {
         .digest("hex"),
     },
   });
+}
+
+function paymentConfirmation(payment) {
+  return {
+    razorpay_order_id: payment.order_id,
+    razorpay_payment_id: payment.id,
+    razorpay_signature: createHmac("sha256", checkoutSecret)
+      .update(payment.order_id + "|" + payment.id)
+      .digest("hex"),
+  };
+}
+
+async function verifyAttemptIsolation(page, guest, source, body) {
+  const scenarios = [
+    ["full", "refund-first"],
+    ["full", "capture-first"],
+    ["partial", "refund-first"],
+    ["partial", "capture-first"],
+    ["dispute", "refund-first"],
+    ["dispute", "capture-first"],
+    ["full", "concurrent"],
+    ["partial", "owner-reconciliation"],
+  ];
+  const existingProviderOrders = providerOrders.size;
+  for (const [index, [financial, sequence]] of scenarios.entries()) {
+    const invitation = randomUUID();
+    const order = "order_Isolation" + index;
+    const slug = "attempt-isolation-" + index;
+    await db.query(
+      "insert into public.invitations (id,owner_id,template_id,data) select $1,owner_id,template_id,data - 'coverImage' from public.invitations where id=$2",
+      [invitation, source],
+    );
+    await db.query(
+      "insert into public.orders (invitation_id,owner_id,template_id,amount_paise,gateway_order_id,status) select id,owner_id,template_id,89900,$2,'test_created' from public.invitations where id=$1",
+      [invitation, order],
+    );
+    const funding = {
+      id: "pay_FundingIsolation" + index,
+      order_id: order,
+      amount: 89900,
+      currency: "INR",
+      status: "captured",
+      captured: true,
+      amount_refunded: 0,
+      refund_status: null,
+    };
+    const earlier = {
+      ...funding,
+      id: "pay_EarlierIsolation" + index,
+      status:
+        financial === "full"
+          ? "refunded"
+          : financial === "partial"
+            ? "captured"
+            : "authorized",
+      captured: financial === "partial",
+      amount_refunded:
+        financial === "full" ? 89900 : financial === "partial" ? 150 : 0,
+      refund_status: financial === "dispute" ? null : financial,
+    };
+    providerPayments.set(earlier.id, earlier);
+    providerPayments.set(funding.id, funding);
+    const event =
+      financial === "dispute"
+        ? {
+            event: "payment.dispute.created",
+            payload: {
+              payment: { entity: earlier },
+              dispute: {
+                entity: {
+                  id: "disp_Isolation" + index,
+                  payment_id: earlier.id,
+                },
+              },
+            },
+          }
+        : {
+            event: "refund.processed",
+            payload: {
+              payment: { entity: earlier },
+              refund: {
+                entity: {
+                  id: "rfnd_Isolation" + index,
+                  payment_id: earlier.id,
+                  status: "processed",
+                },
+              },
+            },
+          };
+    const eventId = randomUUID();
+    const hold = async () =>
+      assert.equal((await sendWebhook(event, true, eventId)).status, 204);
+    const capture = async () =>
+      assert.equal(
+        (
+          await sendWebhook({
+            event: "payment.captured",
+            payload: { payment: { entity: funding } },
+          })
+        ).status,
+        204,
+      );
+    const callback = async () =>
+      assert.deepEqual(
+        await post(page, "/api/verify-payment", paymentConfirmation(funding)),
+        { status: 200, data: { success: true } },
+      );
+    if (sequence === "capture-first") {
+      await callback();
+      await hold();
+      await capture();
+    } else if (sequence === "concurrent") {
+      await Promise.all([hold(), callback()]);
+      await capture();
+    } else {
+      await hold();
+      if (sequence === "owner-reconciliation") {
+        const status = await page.request.get(
+          base + "/api/checkout/" + invitation,
+        );
+        assert.deepEqual(await status.json(), { state: "verified" });
+      } else await capture();
+      await callback();
+    }
+    await hold();
+    assert.equal(
+      (
+        await sendWebhook({
+          event: "payment.failed",
+          payload: { payment: { entity: { ...earlier, status: "failed" } } },
+        })
+      ).status,
+      204,
+    );
+    const result = await post(page, "/api/publish/" + invitation, {
+      ...body,
+      expectedVersion: 1,
+      slug,
+    });
+    assert.deepEqual(result, { status: 200, data: { slug } });
+    const guestResponse = await guest.request.get(base + "/i/" + slug);
+    assert.equal(guestResponse.status(), 200);
+    const html = await guestResponse.text();
+    assert(html.includes("Tara") && !html.includes("YUGMA DEMO"));
+  }
+  assert.equal(providerOrders.size, existingProviderOrders);
+  pass(
+    "Eight checkout and publication scenarios isolated full refunds, partial refunds and disputes across both delivery orders, duplicates, delayed events, concurrent delivery and owner reconciliation.",
+  );
 }
 
 const listen = (server) =>
@@ -619,13 +779,7 @@ try {
     refund_status: null,
   };
   providerPayments.set(payment.id, payment);
-  const confirmation = {
-    razorpay_order_id: order,
-    razorpay_payment_id: payment.id,
-    razorpay_signature: createHmac("sha256", checkoutSecret)
-      .update(order + "|" + payment.id)
-      .digest("hex"),
-  };
+  const confirmation = paymentConfirmation(payment);
   providerPayments.set(payment.id, { ...payment, status: "failed" });
   assert.equal(
     (await post(page, "/api/verify-payment", confirmation)).data.state,
@@ -829,6 +983,23 @@ try {
   assert.equal(retry.data.slug, slug);
   await page.goto(base + "/studio");
   await role(page, "link", "View and share").waitFor();
+  await verifyAttemptIsolation(page, guest, id, body);
+  assert.equal(
+    (
+      await sendWebhook({
+        event: "payment.dispute.created",
+        payload: {
+          payment: { entity: payment },
+          dispute: {
+            entity: { id: "disp_FundingFixture", payment_id: payment.id },
+          },
+        },
+      })
+    ).status,
+    204,
+  );
+  assert.equal((await guest.request.get(guestUrl)).status(), 404);
+  assert.equal((await guest.request.get(guestUrl + "/cover")).status(), 404);
   const refundNotice = {
     event: "refund.processed",
     payload: {

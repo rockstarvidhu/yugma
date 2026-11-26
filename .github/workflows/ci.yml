@@ -72,6 +72,7 @@ jobs:
           docker exec -i "$DB_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/test_invitation_publication.sql
           docker exec -i "$DB_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/verified_test_fulfilment.sql
           docker exec -i "$DB_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/test_publication_entitlement.sql
+          docker exec -i "$DB_CONTAINER" psql -U postgres -v ON_ERROR_STOP=1 < supabase/tests/test_payment_attempts.sql
           bash supabase/tests/verified_test_fulfilment_concurrency.sh
       - name: Exercise the Day 6 payment upgrade with legacy data
         env:
@@ -86,9 +87,13 @@ jobs:
             if [[ "$migration" == supabase/migrations/20261124120000_* ]]; then
               apply --single-transaction < supabase/fixtures/day6-upgrade.sql
             fi
+            if [[ "$migration" == supabase/migrations/20261124120300_* ]]; then
+              apply --single-transaction < supabase/fixtures/day6-attempt-upgrade.sql
+            fi
             apply --single-transaction < "$migration"
           done
           apply < supabase/tests/day6_upgrade.sql
+          apply < supabase/tests/day6_attempt_upgrade.sql
           results=$(mktemp -d)
           pids=()
           for call in {1..6}; do
